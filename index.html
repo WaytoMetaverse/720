@@ -379,7 +379,7 @@
         <a-assets id="vr-assets">
             <img id="vr-panorama" crossorigin="anonymous">
         </a-assets>
-        <a-sky id="vr-sky" rotation="0 -90 0"></a-sky>
+        <a-sky id="vr-sky" rotation="0 0 0"></a-sky>
         <!-- 添加控制器射線 -->
         <a-entity laser-controls="hand: right" raycaster="objects: .vr-hotspot;"></a-entity>
         <a-entity laser-controls="hand: left" raycaster="objects: .vr-hotspot;"></a-entity>
@@ -746,7 +746,11 @@
             
             // 強制A-Frame場景使用圖片
             const sky = document.getElementById('vr-sky');
-            sky.setAttribute('src', scene.url + '?t=' + new Date().getTime());
+            sky.setAttribute('src', '#vr-panorama');
+            
+            // 確保天空球的旋轉方向與Pannellum一致
+            // 注意：可能需要調整這些角度以匹配您的特定全景圖
+            sky.setAttribute('rotation', '0 0 0');
             
             console.log("VR場景載入:", scene.url);
             
@@ -757,45 +761,65 @@
             // 添加當前場景的熱點到VR場景
             if (scene.hotSpots && scene.hotSpots.length > 0) {
                 scene.hotSpots.forEach(hotspot => {
-                    // 將Pannellum坐標轉換為A-Frame坐標
-                    // Pannellum使用pitch(上下,-90到90)和yaw(左右,-180到180)
-                    // A-Frame使用球面坐標系
-                    const phi = THREE.MathUtils.degToRad(90 - hotspot.pitch);
-                    const theta = THREE.MathUtils.degToRad(hotspot.yaw);
+                    // 改進的Pannellum到A-Frame坐標轉換
+                    // Pannellum: pitch是垂直角度(-90到90)，yaw是水平角度(-180到180)
+                    // 修正坐標系統差異和初始方向
+                    
+                    // 將角度轉換為弧度
+                    const yawRad = THREE.MathUtils.degToRad(hotspot.yaw);
+                    const pitchRad = THREE.MathUtils.degToRad(hotspot.pitch);
                     
                     // 計算3D位置 (半徑10的球體)
+                    // 注意：這裡使用了與Pannellum更匹配的坐標轉換
                     const radius = 10;
-                    const x = radius * Math.sin(phi) * Math.cos(theta);
-                    const y = radius * Math.cos(phi);
-                    const z = radius * Math.sin(phi) * Math.sin(theta);
+                    const x = -radius * Math.sin(yawRad) * Math.cos(pitchRad);
+                    const y = radius * Math.sin(pitchRad);
+                    const z = -radius * Math.cos(yawRad) * Math.cos(pitchRad);
                     
                     // 創建熱點元素
                     const hotspotEl = document.createElement('a-entity');
                     hotspotEl.classList.add('vr-hotspot');
+                    hotspotEl.setAttribute('id', 'vr-' + (hotspot.id || hotspot.sceneId));
                     
                     // 設置位置
                     hotspotEl.setAttribute('position', `${x} ${y} ${z}`);
                     
-                    // 創建熱點外觀
+                    // 創建更明顯、更符合VR交互習慣的熱點
                     let color = hotspot.type === 'info' ? '#3498db' : '#e74c3c';
-                    hotspotEl.setAttribute('geometry', 'primitive: sphere; radius: 0.3');
-                    hotspotEl.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.8`);
                     
-                    // 添加動畫效果使熱點更明顯
-                    hotspotEl.setAttribute('animation', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
+                    // 使用圓環形狀，更容易辨識且更符合VR設計
+                    hotspotEl.setAttribute('geometry', 'primitive: ring; radiusInner: 0.2; radiusOuter: 0.3');
+                    hotspotEl.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9; side: double`);
                     
-                    // 添加文字標籤
-                    const textEl = document.createElement('a-text');
-                    textEl.setAttribute('value', hotspot.text);
-                    textEl.setAttribute('align', 'center');
+                    // 添加內部填充，使熱點更明顯
+                    const innerCircle = document.createElement('a-entity');
+                    innerCircle.setAttribute('geometry', 'primitive: circle; radius: 0.18');
+                    innerCircle.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.5; side: double`);
+                    innerCircle.setAttribute('position', '0 0 -0.01');
+                    hotspotEl.appendChild(innerCircle);
+                    
+                    // 添加動畫效果使熱點更明顯 - 脈動效果
+                    hotspotEl.setAttribute('animation__scale', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
+                    // 添加旋轉動畫，更容易被注意到
+                    hotspotEl.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true');
+                    
+                    // 添加文字標籤，確保始終面向用戶
+                    const textEl = document.createElement('a-entity');
+                    textEl.setAttribute('text', `value: ${hotspot.text}; align: center; width: 5; color: white; side: double`);
                     textEl.setAttribute('position', '0 0.5 0');
-                    textEl.setAttribute('scale', '2 2 2');
-                    textEl.setAttribute('color', 'white');
+                    textEl.setAttribute('geometry', 'primitive: plane; width: auto; height: auto');
+                    textEl.setAttribute('material', 'color: #333; opacity: 0.7');
                     textEl.setAttribute('look-at', '[camera]');
                     hotspotEl.appendChild(textEl);
                     
                     // 添加點擊事件
                     hotspotEl.addEventListener('click', function() {
+                        // 添加點擊反饋 - 顏色變化
+                        this.setAttribute('material', `color: white; shader: flat; opacity: 0.9`);
+                        setTimeout(() => {
+                            this.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9`);
+                        }, 200);
+                        
                         if (hotspot.type === 'scene' && hotspot.sceneId) {
                             // 不退出VR，直接切換場景
                             
@@ -825,6 +849,15 @@
                             // 創建一個VR內的信息面板
                             showVRInfoPanel(hotspot.id, x, y, z);
                         }
+                    });
+                    
+                    // 添加懸停效果（對於支援滑鼠的設備）
+                    hotspotEl.addEventListener('mouseenter', function() {
+                        this.setAttribute('scale', '1.3 1.3 1.3');
+                    });
+                    
+                    hotspotEl.addEventListener('mouseleave', function() {
+                        this.setAttribute('scale', '1 1 1');
                     });
                     
                     // 將熱點添加到場景
@@ -884,51 +917,80 @@
             // 創建信息面板容器
             const panel = document.createElement('a-entity');
             panel.id = 'vr-info-panel';
-            panel.setAttribute('position', `${x} ${y} ${z}`);
             
-            // 計算面向用戶的方向
-            const camera = document.querySelector('a-camera') || document.querySelector('[camera]');
+            // 將面板放置在熱點位置前方，保持距離
+            const cameraPosition = document.querySelector('[camera]').getAttribute('position');
+            // 計算朝向用戶的方向
+            const directionX = cameraPosition.x - x;
+            const directionY = 0; // 保持與用戶視線水平
+            const directionZ = cameraPosition.z - z;
+            
+            // 單位化方向向量
+            const length = Math.sqrt(directionX * directionX + directionZ * directionZ);
+            const normalizedX = directionX / length;
+            const normalizedZ = directionZ / length;
+            
+            // 在該方向上移動一定距離
+            const distance = 2;
+            const finalX = x + normalizedX * distance;
+            const finalZ = z + normalizedZ * distance;
+            
+            panel.setAttribute('position', `${finalX} ${y} ${finalZ}`);
             panel.setAttribute('look-at', '[camera]');
             
-            // 創建背景板
-            const background = document.createElement('a-plane');
-            background.setAttribute('width', 4);
-            background.setAttribute('height', 2.5);
-            background.setAttribute('color', '#fff');
-            background.setAttribute('opacity', 0.9);
-            background.setAttribute('position', '0 0 0.1');
+            // 創建背景板 - 使用更友好的VR界面設計
+            const background = document.createElement('a-entity');
+            background.setAttribute('geometry', 'primitive: plane; width: 4; height: 2.5');
+            background.setAttribute('material', 'color: #2c3e50; opacity: 0.85; shader: flat; side: double');
+            background.setAttribute('position', '0 0 0');
+            background.setAttribute('rotation', '0 0 0');
+            // 添加圓角效果 (通過四個角的小圓盤實現視覺上的圓角)
+            ['1.9 1.15 0.01', '1.9 -1.15 0.01', '-1.9 1.15 0.01', '-1.9 -1.15 0.01'].forEach(pos => {
+                const corner = document.createElement('a-entity');
+                corner.setAttribute('geometry', 'primitive: circle; radius: 0.1');
+                corner.setAttribute('material', 'color: #2c3e50; opacity: 0.85; shader: flat');
+                corner.setAttribute('position', pos);
+                background.appendChild(corner);
+            });
             panel.appendChild(background);
             
-            // 添加標題
-            const title = document.createElement('a-text');
-            title.setAttribute('value', info.title);
-            title.setAttribute('align', 'center');
-            title.setAttribute('width', 3.8);
-            title.setAttribute('position', '0 1 0.2');
-            title.setAttribute('color', '#333');
-            title.setAttribute('font', 'kelsonsans');
+            // 添加標題 - 更好的排版
+            const title = document.createElement('a-entity');
+            title.setAttribute('text', `value: ${info.title}; align: center; width: 3.8; color: white; wrapCount: 30; font: default`);
+            title.setAttribute('position', '0 1 0.02');
             panel.appendChild(title);
             
-            // 添加描述文字
-            const description = document.createElement('a-text');
-            description.setAttribute('value', info.description);
-            description.setAttribute('align', 'left');
-            description.setAttribute('width', 3.5);
-            description.setAttribute('wrap-count', 35);
-            description.setAttribute('position', '-1.75 0 0.2');
-            description.setAttribute('color', '#333');
-            description.setAttribute('font', 'kelsonsans');
+            // 添加描述文字 - 更好的可讀性
+            const description = document.createElement('a-entity');
+            description.setAttribute('text', `value: ${info.description}; align: left; width: 3.5; wrapCount: 40; color: white; font: default`);
+            description.setAttribute('position', '-1.75 0 0.02');
             panel.appendChild(description);
             
-            // 添加關閉按鈕
+            // 添加關閉按鈕 - 更明顯的交互元素
             const closeBtn = document.createElement('a-entity');
-            closeBtn.setAttribute('position', '1.8 1 0.2');
-            closeBtn.setAttribute('geometry', 'primitive: plane; width: 0.3; height: 0.3');
-            closeBtn.setAttribute('material', 'color: #e74c3c');
-            closeBtn.setAttribute('text', 'value: X; align: center; color: white; width: 3');
+            closeBtn.setAttribute('position', '1.8 1.1 0.03');
+            closeBtn.setAttribute('geometry', 'primitive: circle; radius: 0.15');
+            closeBtn.setAttribute('material', 'color: #e74c3c; shader: flat');
+            closeBtn.setAttribute('text', 'value: X; align: center; width: 1; color: white; zOffset: 0.01');
             closeBtn.classList.add('vr-hotspot');  // 確保可點擊
+            
+            // 添加按鈕懸停和點擊效果
+            closeBtn.addEventListener('mouseenter', function() {
+                this.setAttribute('material', 'color: #c0392b');
+            });
+            closeBtn.addEventListener('mouseleave', function() {
+                this.setAttribute('material', 'color: #e74c3c');
+            });
             closeBtn.addEventListener('click', function() {
-                panel.parentNode.removeChild(panel);
+                panel.setAttribute('animation', {
+                    property: 'scale',
+                    to: '0.01 0.01 0.01',
+                    dur: 200,
+                    easing: 'easeInQuad',
+                    onComplete: function() {
+                        panel.parentNode.removeChild(panel);
+                    }
+                });
             });
             panel.appendChild(closeBtn);
             
@@ -936,12 +998,12 @@
             vrScene.appendChild(panel);
             
             // 添加進入動畫
+            panel.setAttribute('scale', '0.01 0.01 0.01');
             panel.setAttribute('animation', {
                 property: 'scale',
-                from: '0.1 0.1 0.1',
                 to: '1 1 1',
                 dur: 300,
-                easing: 'easeOutQuad'
+                easing: 'easeOutBack'
             });
         }
 
