@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡化版環景導覽平台</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pannellum/2.5.6/pannellum.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pannellum/2.5.6/pannellum.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .vr-btn {
+            background-color: #e74c3c;
+        }
+        
+        .vr-btn:hover {
+            background-color: #c0392b;
+        }
+        
+        .main-content {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+        
+        #panorama {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .property-info {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 1rem;
+            border-radius: 4px;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .room-selector {
+            position: absolute;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 0.5rem;
+            border-radius: 4px;
+            display: flex;
+            gap: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .room-btn {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .room-btn:hover, .room-btn.active {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 1001;
+        }
+        
+        .loader::after {
+            content: "";
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">房地產環景導覽</div>
+            <div class="controls">
+                <button class="btn" id="fullscreen-btn">全螢幕</button>
+                <button class="btn vr-btn" id="vr-btn">VR模式</button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div id="panorama"></div>
+            
+            <div class="property-info">
+                <h2>豪華示範住宅</h2>
+                <p><strong>坪數:</strong> 40坪</p>
+                <p><strong>格局:</strong> 4房2廳2衛</p>
+                <p><strong>樓層:</strong> 1-4F/RF</p>
+                <p><strong>地址:</strong> 維次宇宙</p>
+            </div>
+            
+            <div class="room-selector">
+                <button class="room-btn active" data-room="living">客廳</button>
+                <button class="room-btn" data-room="kitchen">餐廳</button>
+                <button class="room-btn" data-room="master">2F臥室</button>
+                <button class="room-btn" data-room="bedroom">3F臥室</button>
+                <button class="room-btn" data-room="bathroom">浴室</button>
+                <button class="room-btn" data-room="balcony">陽台</button>
+            </div>
+            
+            <div class="loader" id="loader"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 定義房間全景圖的URL (使用相對路徑)
+        const rooms = {
+            living: {
+                url: "1F客廳.jpg", 
+                title: "寬敞客廳"
+            },
+            kitchen: {
+                url: "1F餐廳.jpg", 
+                title: "餐廳"
+            },
+            master: {
+                url: "2F臥室.jpg", 
+                title: "臥室"
+            },
+            bedroom: {
+                url: "3F臥室1.jpg", 
+                title: "次臥"
+            },
+            bathroom: {
+                url: "2F浴室.jpg", 
+                title: "浴室"
+            },
+            balcony: {
+                url: "RF陽台.jpg", 
+                title: "陽台"
+            }
+        };
+        
+        // 初始化全景圖
+        let viewer;
+        let currentScene = 'living';
+        
+        function loadScene(sceneName) {
+            const scene = rooms[sceneName];
+            
+            // 顯示加載圖標
+            document.getElementById('loader').style.display = 'flex';
+            
+            // 如果已有viewer則銷毀
+            if (viewer) {
+                viewer.destroy();
+            }
+            
+            // 創建新的viewer
+            viewer = pannellum.viewer('panorama', {
+                default: {
+                    firstScene: sceneName
+                },
+                scenes: {
+                    [sceneName]: {
+                        title: scene.title,
+                        hfov: 110,
+                        pitch: 0,
+                        yaw: 0,
+                        type: "equirectangular",
+                        panorama: scene.url,
+                        autoLoad: true
+                    }
+                },
+                autoLoad: true
+            });
+            
+            // 更新當前場景
+            currentScene = sceneName;
+            
+            // 更新房間選擇按鈕狀態
+            document.querySelectorAll('.room-btn').forEach(btn => {
+                if (btn.dataset.room === sceneName) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // 監聽全景圖加載完成事件
+            viewer.on('load', function() {
+                // 隱藏加載圖標
+                document.getElementById('loader').style.display = 'none';
+            });
+        }
+        
+        // 等待文檔加載完成
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加載初始場景
+            loadScene('living');
+            
+            // 房間切換按鈕事件
+            document.querySelectorAll('.room-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    loadScene(this.dataset.room);
+                });
+            });
+            
+            // 全螢幕按鈕事件
+            document.getElementById('fullscreen-btn').addEventListener('click', function() {
+                if (viewer) {
+                    viewer.toggleFullscreen();
+                }
+            });
+            
+            // VR按鈕事件
+            document.getElementById('vr-btn').addEventListener('click', function() {
+                if (viewer) {
+                    if (navigator.getVRDisplays) {
+                        alert('正在啟動VR模式，請戴上您的VR裝置');
+                        viewer.startVR();
+                    } else {
+                        alert('您的瀏覽器不支持VR功能，請使用支持WebVR的瀏覽器');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
