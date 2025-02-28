@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pannellum/2.5.6/pannellum.css">
     <!-- 添加A-Frame支援WebXR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+    <!-- 添加three.js用於坐標轉換 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -373,14 +375,18 @@
     
     <!-- VR模式的A-Frame場景 -->
     <button id="exit-vr-btn" class="exit-vr-btn">退出VR</button>
-    <a-scene id="vr-scene" embedded vr-mode-ui="enabled: true" style="display: none;">
+    <a-scene id="vr-scene" embedded vr-mode-ui="enabled: true" style="display: none;" cursor="rayOrigin: mouse" raycaster="objects: .vr-hotspot">
         <a-assets id="vr-assets">
-            <!-- 添加crossorigin屬性解決CORS問題 -->
             <img id="vr-panorama" crossorigin="anonymous">
         </a-assets>
         <a-sky id="vr-sky" rotation="0 -90 0"></a-sky>
-        <!-- 添加相機控制 -->
-        <a-camera position="0 1.6 0"></a-camera>
+        <!-- 添加控制器射線 -->
+        <a-entity laser-controls="hand: right" raycaster="objects: .vr-hotspot;"></a-entity>
+        <a-entity laser-controls="hand: left" raycaster="objects: .vr-hotspot;"></a-entity>
+        <!-- 相機及游標 -->
+        <a-camera position="0 1.6 0">
+            <a-cursor raycaster="objects: .vr-hotspot"></a-cursor>
+        </a-camera>
     </a-scene>
     
     <script>
@@ -869,34 +875,108 @@
         // WebXR VR模式相關函數
         function enterVRMode() {
             const scene = rooms[currentScene];
-    
+            
             // 先設置場景為可見
             document.getElementById('vr-scene').style.display = 'block';
             document.getElementById('exit-vr-btn').style.display = 'block';
             
             // 設置全景圖片並確保刷新
             const panoramaImg = document.getElementById('vr-panorama');
-            panoramaImg.src = scene.url;
-    
+            // 添加時間戳以避免緩存問題
+            panoramaImg.src = scene.url + '?t=' + new Date().getTime();
+            
             // 強制A-Frame場景使用圖片
             const sky = document.getElementById('vr-sky');
-            sky.setAttribute('src', scene.url);
-    
+            sky.setAttribute('src', scene.url + '?t=' + new Date().getTime());
+            
             console.log("VR模式啟動，載入圖片:", scene.url);
-    
+            
+            // 清除之前的熱點
+            const vrScene = document.querySelector('a-scene');
+            vrScene.querySelectorAll('.vr-hotspot').forEach(el => el.parentNode.removeChild(el));
+            
+            // 添加當前場景的熱點到VR場景
+            if (scene.hotSpots && scene.hotSpots.length > 0) {
+                scene.hotSpots.forEach(hotspot => {
+                    // 將Pannellum坐標轉換為A-Frame坐標
+                    // Pannellum使用pitch(上下,-90到90)和yaw(左右,-180到180)
+                    // A-Frame使用球面坐標系
+                    const phi = THREE.MathUtils.degToRad(90 - hotspot.pitch);
+                    const theta = THREE.MathUtils.degToRad(hotspot.yaw);
+                    
+                    // 計算3D位置 (半徑10的球體)
+                    const radius = 10;
+                    const x = radius * Math.sin(phi) * Math.cos(theta);
+                    const y = radius * Math.cos(phi);
+                    const z = radius * Math.sin(phi) * Math.sin(theta);
+                    
+                    // 創建熱點元素
+                    const hotspotEl = document.createElement('a-entity');
+                    hotspotEl.classList.add('vr-hotspot');
+                    
+                    // 設置位置
+                    hotspotEl.setAttribute('position', `${x} ${y} ${z}`);
+                    
+                    // 創建熱點外觀
+                    let color = hotspot.type === 'info' ? '#3498db' : '#e74c3c';
+                    hotspotEl.setAttribute('geometry', 'primitive: sphere; radius: 0.3');
+                    hotspotEl.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.8`);
+                    
+                    // 添加動畫效果使熱點更明顯
+                    hotspotEl.setAttribute('animation', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
+                    
+                    // 添加文字標籤
+                    const textEl = document.createElement('a-text');
+                    textEl.setAttribute('value', hotspot.text);
+                    textEl.setAttribute('align', 'center');
+                    textEl.setAttribute('position', '0 0.5 0');
+                    textEl.setAttribute('scale', '2 2 2');
+                    textEl.setAttribute('color', 'white');
+                    textEl.setAttribute('look-at', '[camera]');
+                    hotspotEl.appendChild(textEl);
+                    
+                    // 添加點擊事件
+                    hotspotEl.addEventListener('click', function() {
+                        if (hotspot.type === 'scene' && hotspot.sceneId) {
+                            // 先退出VR模式
+                            exitVRMode();
+                            // 然後切換場景
+                            setTimeout(() => loadScene(hotspot.sceneId), 500);
+                        } else if (hotspot.type === 'info' && hotspot.id) {
+                            // 先退出VR模式
+                            exitVRMode();
+                            // 然後顯示信息
+                            setTimeout(() => showInfoPopup(hotspot.id), 500);
+                        }
+                    });
+                    
+                    // 將熱點添加到場景
+                    vrScene.appendChild(hotspotEl);
+                });
+            }
+            
             // 隱藏普通介面
             document.querySelector('.container').style.display = 'none';
-    
-            // 等待A-Frame載入完成再進入VR
-            const sceneEl = document.querySelector('a-scene');
-            if (sceneEl.hasLoaded) {
+            
+            // 嘗試進入VR模式
+            if (vrScene.hasLoaded) {
                 setTimeout(() => {
-                    sceneEl.enterVR();
-                }, 1000); // 延遲1秒確保圖片已載入
+                    try {
+                        vrScene.enterVR();
+                    } catch (e) {
+                        console.error("進入VR模式時發生錯誤:", e);
+                        // 如果無法進入VR模式，仍然顯示360環景
+                    }
+                }, 1000);
             } else {
-                sceneEl.addEventListener('loaded', function() {
+                vrScene.addEventListener('loaded', function() {
                     setTimeout(() => {
-                        sceneEl.enterVR();
+                        try {
+                            vrScene.enterVR();
+                        } catch (e) {
+                            console.error("進入VR模式時發生錯誤:", e);
+                            // 如果無法進入VR模式，仍然顯示360環景
+                        }
                     }, 1000);
                 });
             }
@@ -910,7 +990,7 @@
             
             // 確保A-Frame場景退出VR
             const sceneEl = document.querySelector('a-scene');
-            if (sceneEl.is('vr-mode')) {
+            if (sceneEl.is && sceneEl.is('vr-mode')) {
                 sceneEl.exitVR();
             }
         }
@@ -949,7 +1029,9 @@
                             if (supported) {
                                 enterVRMode();
                             } else {
-                                alert('您的設備不支援WebXR VR模式。');
+                                // 即使不支持沉浸式VR，也嘗試使用A-Frame提供的VR體驗
+                                console.log("設備不支持沉浸式VR，將使用A-Frame提供的VR體驗");
+                                enterVRMode();
                             }
                         })
                         .catch(function(error) {
@@ -964,15 +1046,17 @@
                             if (displays.length > 0) {
                                 enterVRMode();
                             } else {
-                                alert('未檢測到VR設備。');
+                                // 即使沒有檢測到VR顯示，也嘗試使用A-Frame提供的VR體驗
+                                enterVRMode();
                             }
                         })
                         .catch(function(error) {
-                            alert('您的瀏覽器不支援VR模式。');
+                            console.log('舊版WebVR API錯誤，將使用A-Frame提供的VR體驗');
+                            enterVRMode();
                         });
                 } else {
                     // 無VR支援時，仍嘗試使用A-Frame
-                    alert('未檢測到VR支援，將使用模擬VR模式。');
+                    console.log('未檢測到VR支援，將使用A-Frame提供的VR體驗');
                     enterVRMode();
                 }
             });
