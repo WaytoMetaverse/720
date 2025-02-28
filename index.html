@@ -390,189 +390,42 @@
     </a-scene>
     
     <script>
-        // 使用相對路徑的房間全景圖定義
+        // 使用相對路徑的房間全景圖定義（移除預設熱點）
         const rooms = {
             living: {
                 url: "1F客廳.jpg", 
                 title: "寬敞客廳",
-                hotSpots: [
-                    {
-                        pitch: 0,
-                        yaw: 10,
-                        type: "info",
-                        text: "客廳沙發區",
-                        id: "sofa"
-                    },
-                    {
-                        pitch: -10,
-                        yaw: 140,
-                        type: "info",
-                        text: "電視牆",
-                        id: "tv"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 220,
-                        type: "scene",
-                        text: "前往餐廳",
-                        sceneId: "kitchen"
-                    }
-                ]
+                hotSpots: []
             },
             kitchen: {
                 url: "1F餐廳.jpg", 
                 title: "餐廳",
-                hotSpots: [
-                    {
-                        pitch: 0,
-                        yaw: 10,
-                        type: "info",
-                        text: "餐桌",
-                        id: "island"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 100,
-                        type: "scene",
-                        text: "前往客廳",
-                        sceneId: "living"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 280,
-                        type: "scene",
-                        text: "前往臥室",
-                        sceneId: "master"
-                    }
-                ]
+                hotSpots: []
             },
             master: {
                 url: "2F臥室.jpg", 
                 title: "臥室",
-                hotSpots: [
-                    {
-                        pitch: 0,
-                        yaw: 10,
-                        type: "info",
-                        text: "床",
-                        id: "bed"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 100,
-                        type: "scene",
-                        text: "前往餐廳",
-                        sceneId: "kitchen"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 280,
-                        type: "scene",
-                        text: "前往浴室",
-                        sceneId: "bathroom"
-                    }
-                ]
+                hotSpots: []
             },
             bedroom: {
                 url: "3F臥室1.jpg", 
                 title: "次臥",
-                hotSpots: [
-                    {
-                        pitch: 0,
-                        yaw: 10,
-                        type: "info",
-                        text: "書桌",
-                        id: "desk"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 280,
-                        type: "scene",
-                        text: "前往客廳",
-                        sceneId: "living"
-                    }
-                ]
+                hotSpots: []
             },
             bathroom: {
                 url: "2F浴室.jpg", 
                 title: "浴室",
-                hotSpots: [
-                    {
-                        pitch: 0,
-                        yaw: 10,
-                        type: "info",
-                        text: "浴缸",
-                        id: "bathtub"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 280,
-                        type: "scene",
-                        text: "前往臥室",
-                        sceneId: "master"
-                    }
-                ]
+                hotSpots: []
             },
             balcony: {
                 url: "RF陽台.jpg", 
                 title: "陽台",
-                hotSpots: [
-                    {
-                        pitch: 0,
-                        yaw: 10,
-                        type: "info",
-                        text: "城市景觀",
-                        id: "view"
-                    },
-                    {
-                        pitch: 0,
-                        yaw: 280,
-                        type: "scene",
-                        text: "前往客廳",
-                        sceneId: "living"
-                    }
-                ]
+                hotSpots: []
             }
         };
         
-        // 熱點信息
-        const hotspotInfo = {
-            sofa: {
-                title: "高級舒適沙發",
-                img: "1F客廳.jpg",
-                description: "義大利進口頂級真皮沙發，舒適耐用，可容納6-8人。特別設計的弧形設計提供絕佳的觀影和社交體驗。"
-            },
-            tv: {
-                title: "大型智能電視牆",
-                img: "1F客廳.jpg",
-                description: "內建65吋4K智能電視和環繞音響系統，牆面採用特殊吸音材料，提供極佳的視聽體驗。"
-            },
-            island: {
-                title: "餐桌",
-                img: "1F餐廳.jpg",
-                description: "寬敞的餐桌空間，可容納全家人共同用餐，是家庭聚會的理想場所。"
-            },
-            bed: {
-                title: "舒適臥室",
-                img: "2F臥室.jpg",
-                description: "寬敞明亮的臥室空間，配備高品質床墊，確保最佳睡眠品質。"
-            },
-            desk: {
-                title: "實木書桌",
-                img: "3F臥室1.jpg",
-                description: "由進口實木製成的寬敞書桌，完美適合工作或學習使用。"
-            },
-            bathtub: {
-                title: "精緻浴室",
-                img: "2F浴室.jpg",
-                description: "現代化衛浴設施，配備舒適浴缸，讓您在家也能享受放鬆體驗。"
-            },
-            view: {
-                title: "屋頂陽台",
-                img: "RF陽台.jpg",
-                description: "寬敞的陽台空間，提供絕佳的視野，是休閒放鬆的理想場所。"
-            }
-        };
+        // 熱點信息（已清空）
+        const hotspotInfo = {};
         
         // 初始化全景圖
         let viewer;
@@ -874,7 +727,13 @@
 
         // WebXR VR模式相關函數
         function enterVRMode() {
-            const scene = rooms[currentScene];
+            loadVRScene(currentScene);
+        }
+
+        // 新增加載VR場景的函數
+        function loadVRScene(sceneName) {
+            const scene = rooms[sceneName];
+            currentScene = sceneName; // 更新當前場景
             
             // 先設置場景為可見
             document.getElementById('vr-scene').style.display = 'block';
@@ -889,7 +748,7 @@
             const sky = document.getElementById('vr-sky');
             sky.setAttribute('src', scene.url + '?t=' + new Date().getTime());
             
-            console.log("VR模式啟動，載入圖片:", scene.url);
+            console.log("VR場景載入:", scene.url);
             
             // 清除之前的熱點
             const vrScene = document.querySelector('a-scene');
@@ -938,15 +797,33 @@
                     // 添加點擊事件
                     hotspotEl.addEventListener('click', function() {
                         if (hotspot.type === 'scene' && hotspot.sceneId) {
-                            // 先退出VR模式
-                            exitVRMode();
-                            // 然後切換場景
-                            setTimeout(() => loadScene(hotspot.sceneId), 500);
+                            // 不退出VR，直接切換場景
+                            
+                            // 顯示過渡效果
+                            sky.setAttribute('animation', {
+                                property: 'material.opacity',
+                                from: 1,
+                                to: 0,
+                                dur: 300,
+                                easing: 'easeOutQuad'
+                            });
+                            
+                            // 等待淡出完成後加載新場景
+                            setTimeout(() => {
+                                loadVRScene(hotspot.sceneId);
+                                // 淡入新場景
+                                sky.setAttribute('animation', {
+                                    property: 'material.opacity',
+                                    from: 0,
+                                    to: 1,
+                                    dur: 300,
+                                    easing: 'easeInQuad'
+                                });
+                            }, 300);
                         } else if (hotspot.type === 'info' && hotspot.id) {
-                            // 先退出VR模式
-                            exitVRMode();
-                            // 然後顯示信息
-                            setTimeout(() => showInfoPopup(hotspot.id), 500);
+                            // 對於信息熱點，我們需要在VR中顯示信息
+                            // 創建一個VR內的信息面板
+                            showVRInfoPanel(hotspot.id, x, y, z);
                         }
                     });
                     
@@ -955,21 +832,21 @@
                 });
             }
             
+            // 更新房間選擇按鈕狀態 (即使在VR模式下也保持同步)
+            document.querySelectorAll('.room-btn').forEach(btn => {
+                if (btn.dataset.room === sceneName) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
             // 隱藏普通介面
             document.querySelector('.container').style.display = 'none';
             
-            // 嘗試進入VR模式
-            if (vrScene.hasLoaded) {
-                setTimeout(() => {
-                    try {
-                        vrScene.enterVR();
-                    } catch (e) {
-                        console.error("進入VR模式時發生錯誤:", e);
-                        // 如果無法進入VR模式，仍然顯示360環景
-                    }
-                }, 1000);
-            } else {
-                vrScene.addEventListener('loaded', function() {
+            // 如果這是初次進入VR，嘗試進入VR模式
+            if (!document.querySelector('a-scene').is('vr-mode')) {
+                if (vrScene.hasLoaded) {
                     setTimeout(() => {
                         try {
                             vrScene.enterVR();
@@ -978,8 +855,94 @@
                             // 如果無法進入VR模式，仍然顯示360環景
                         }
                     }, 1000);
-                });
+                } else {
+                    vrScene.addEventListener('loaded', function() {
+                        setTimeout(() => {
+                            try {
+                                vrScene.enterVR();
+                            } catch (e) {
+                                console.error("進入VR模式時發生錯誤:", e);
+                                // 如果無法進入VR模式，仍然顯示360環景
+                            }
+                        }, 1000);
+                    });
+                }
             }
+        }
+
+        // 在VR中顯示信息面板
+        function showVRInfoPanel(hotspotId, x, y, z) {
+            const info = hotspotInfo[hotspotId];
+            const vrScene = document.querySelector('a-scene');
+            
+            // 移除之前的信息面板
+            const oldPanel = vrScene.querySelector('#vr-info-panel');
+            if (oldPanel) {
+                oldPanel.parentNode.removeChild(oldPanel);
+            }
+            
+            // 創建信息面板容器
+            const panel = document.createElement('a-entity');
+            panel.id = 'vr-info-panel';
+            panel.setAttribute('position', `${x} ${y} ${z}`);
+            
+            // 計算面向用戶的方向
+            const camera = document.querySelector('a-camera') || document.querySelector('[camera]');
+            panel.setAttribute('look-at', '[camera]');
+            
+            // 創建背景板
+            const background = document.createElement('a-plane');
+            background.setAttribute('width', 4);
+            background.setAttribute('height', 2.5);
+            background.setAttribute('color', '#fff');
+            background.setAttribute('opacity', 0.9);
+            background.setAttribute('position', '0 0 0.1');
+            panel.appendChild(background);
+            
+            // 添加標題
+            const title = document.createElement('a-text');
+            title.setAttribute('value', info.title);
+            title.setAttribute('align', 'center');
+            title.setAttribute('width', 3.8);
+            title.setAttribute('position', '0 1 0.2');
+            title.setAttribute('color', '#333');
+            title.setAttribute('font', 'kelsonsans');
+            panel.appendChild(title);
+            
+            // 添加描述文字
+            const description = document.createElement('a-text');
+            description.setAttribute('value', info.description);
+            description.setAttribute('align', 'left');
+            description.setAttribute('width', 3.5);
+            description.setAttribute('wrap-count', 35);
+            description.setAttribute('position', '-1.75 0 0.2');
+            description.setAttribute('color', '#333');
+            description.setAttribute('font', 'kelsonsans');
+            panel.appendChild(description);
+            
+            // 添加關閉按鈕
+            const closeBtn = document.createElement('a-entity');
+            closeBtn.setAttribute('position', '1.8 1 0.2');
+            closeBtn.setAttribute('geometry', 'primitive: plane; width: 0.3; height: 0.3');
+            closeBtn.setAttribute('material', 'color: #e74c3c');
+            closeBtn.setAttribute('text', 'value: X; align: center; color: white; width: 3');
+            closeBtn.classList.add('vr-hotspot');  // 確保可點擊
+            closeBtn.addEventListener('click', function() {
+                panel.parentNode.removeChild(panel);
+            });
+            panel.appendChild(closeBtn);
+            
+            // 添加面板到場景
+            vrScene.appendChild(panel);
+            
+            // 添加進入動畫
+            panel.setAttribute('animation', {
+                property: 'scale',
+                from: '0.1 0.1 0.1',
+                to: '1 1 1',
+                dur: 300,
+                easing: 'easeOutQuad'
+            });
         }
 
         function exitVRMode() {
