@@ -373,11 +373,14 @@
     
     <!-- VR模式的A-Frame場景 -->
     <button id="exit-vr-btn" class="exit-vr-btn">退出VR</button>
-    <a-scene id="vr-scene" embedded vr-mode-ui="enabled: true">
+    <a-scene id="vr-scene" embedded vr-mode-ui="enabled: true" style="display: none;">
         <a-assets id="vr-assets">
-            <img id="vr-panorama" src="" crossorigin="anonymous">
+            <!-- 添加crossorigin屬性解決CORS問題 -->
+            <img id="vr-panorama" crossorigin="anonymous">
         </a-assets>
-        <a-sky id="vr-sky" src="#vr-panorama" rotation="0 0 0"></a-sky>
+        <a-sky id="vr-sky" rotation="0 -90 0"></a-sky>
+        <!-- 添加相機控制 -->
+        <a-camera position="0 1.6 0"></a-camera>
     </a-scene>
     
     <script>
@@ -866,22 +869,35 @@
         // WebXR VR模式相關函數
         function enterVRMode() {
             const scene = rooms[currentScene];
-            
-            // 更新A-Frame場景的全景圖
-            document.getElementById('vr-panorama').src = scene.url;
-            
-            // 隱藏普通介面，顯示VR場景
-            document.querySelector('.container').style.display = 'none';
+    
+            // 先設置場景為可見
             document.getElementById('vr-scene').style.display = 'block';
             document.getElementById('exit-vr-btn').style.display = 'block';
             
-            // 嘗試進入VR模式
+            // 設置全景圖片並確保刷新
+            const panoramaImg = document.getElementById('vr-panorama');
+            panoramaImg.src = scene.url;
+    
+            // 強制A-Frame場景使用圖片
+            const sky = document.getElementById('vr-sky');
+            sky.setAttribute('src', scene.url);
+    
+            console.log("VR模式啟動，載入圖片:", scene.url);
+    
+            // 隱藏普通介面
+            document.querySelector('.container').style.display = 'none';
+    
+            // 等待A-Frame載入完成再進入VR
             const sceneEl = document.querySelector('a-scene');
             if (sceneEl.hasLoaded) {
-                sceneEl.enterVR();
+                setTimeout(() => {
+                    sceneEl.enterVR();
+                }, 1000); // 延遲1秒確保圖片已載入
             } else {
                 sceneEl.addEventListener('loaded', function() {
-                    sceneEl.enterVR();
+                    setTimeout(() => {
+                        sceneEl.enterVR();
+                    }, 1000);
                 });
             }
         }
