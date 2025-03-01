@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>房地產環景導覽平台</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pannellum/2.5.6/pannellum.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pannellum/2.5.6/pannellum.css">
-    <!-- 添加A-Frame支援WebXR -->
+    <title>A-Frame 房地產環景導覽平台</title>
+    <!-- 只保留 A-Frame -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <!-- 添加three.js用於坐標轉換 -->
+    <!-- 添加 Three.js 用於數學計算 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * {
@@ -36,6 +34,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
         }
         
         .logo {
@@ -70,26 +73,16 @@
             background-color: #c0392b;
         }
         
-        .main-content {
-            display: flex;
-            flex: 1;
-            position: relative;
-        }
-        
-        #panorama {
-            width: 100%;
-            height: 100%;
-        }
-        
         .property-info {
-            position: absolute;
-            top: 1rem;
+            position: fixed;
+            top: 5rem;
             left: 1rem;
             background-color: rgba(255, 255, 255, 0.8);
             padding: 1rem;
             border-radius: 4px;
             max-width: 300px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 50;
         }
         
         .property-info h2 {
@@ -103,7 +96,7 @@
         }
         
         .room-selector {
-            position: absolute;
+            position: fixed;
             bottom: 1rem;
             left: 50%;
             transform: translateX(-50%);
@@ -113,6 +106,7 @@
             display: flex;
             gap: 0.5rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 50;
         }
         
         .room-btn {
@@ -130,12 +124,8 @@
             color: white;
         }
         
-        .hotspot {
-            cursor: pointer;
-        }
-        
         .info-popup {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -177,7 +167,7 @@
         }
         
         .loader {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
@@ -205,7 +195,7 @@
         }
         
         .editor-controls {
-            position: absolute;
+            position: fixed;
             top: 5rem;
             right: 1rem;
             background-color: rgba(255, 255, 255, 0.8);
@@ -216,6 +206,7 @@
             gap: 0.5rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             z-index: 100;
+            display: none;
         }
         
         .edit-mode {
@@ -227,7 +218,7 @@
         }
         
         .hotspot-form {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -264,29 +255,9 @@
             margin-top: 1rem;
         }
         
-        /* VR模式的A-Frame場景，默認隱藏 */
-        #vr-scene {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 2000;
-            display: none;
-        }
-        
-        .exit-vr-btn {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            z-index: 2001;
-            display: none;
-            background-color: #e74c3c;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 4px;
-            cursor: pointer;
+        /* 隱藏 A-Frame 默認的 VR 按鈕，我們使用自己的 UI */
+        .a-enter-vr {
+            display: none !important;
         }
     </style>
 </head>
@@ -298,30 +269,25 @@
                 <button class="btn" id="fullscreen-btn">全螢幕</button>
                 <button class="btn vr-btn" id="vr-btn">VR模式</button>
                 <button class="btn edit-mode" id="edit-btn">編輯模式</button>
+                <button class="btn" id="exit-edit-btn" style="display: none;">退出編輯</button>
             </div>
         </header>
         
-        <div class="main-content">
-            <div id="panorama"></div>
-            
-            <div class="property-info">
-                <h2>豪華示範住宅</h2>
-                <p><strong>坪數:</strong> 40坪</p>
-                <p><strong>格局:</strong> 4房2廳2衛</p>
-                <p><strong>樓層:</strong> 1-4F/RF</p>
-                <p><strong>地址:</strong> 維次宇宙</p>
-            </div>
-            
-            <div class="room-selector">
-                <button class="room-btn active" data-room="living">客廳</button>
-                <button class="room-btn" data-room="kitchen">餐廳</button>
-                <button class="room-btn" data-room="master">2F臥室</button>
-                <button class="room-btn" data-room="bedroom">3F臥室</button>
-                <button class="room-btn" data-room="bathroom">浴室</button>
-                <button class="room-btn" data-room="balcony">陽台</button>
-            </div>
-            
-            <div class="loader" id="loader"></div>
+        <div class="property-info">
+            <h2>豪華示範住宅</h2>
+            <p><strong>坪數:</strong> 40坪</p>
+            <p><strong>格局:</strong> 4房2廳2衛</p>
+            <p><strong>樓層:</strong> 1-4F/RF</p>
+            <p><strong>地址:</strong> 維次宇宙</p>
+        </div>
+        
+        <div class="room-selector">
+            <button class="room-btn active" data-room="living">客廳</button>
+            <button class="room-btn" data-room="kitchen">餐廳</button>
+            <button class="room-btn" data-room="master">2F臥室</button>
+            <button class="room-btn" data-room="bedroom">3F臥室</button>
+            <button class="room-btn" data-room="bathroom">浴室</button>
+            <button class="room-btn" data-room="balcony">陽台</button>
         </div>
         
         <div class="info-popup" id="info-popup">
@@ -331,7 +297,7 @@
             <p id="popup-description"></p>
         </div>
         
-        <div class="editor-controls" id="editor-controls" style="display: none;">
+        <div class="editor-controls" id="editor-controls">
             <button class="btn" id="add-info-btn">添加資訊熱點</button>
             <button class="btn" id="add-scene-btn">添加場景熱點</button>
             <button class="btn" id="save-hotspots-btn">保存熱點</button>
@@ -371,26 +337,29 @@
                 <button class="btn" id="confirm-hotspot-btn">確認</button>
             </div>
         </div>
+        
+        <div class="loader" id="loader"></div>
     </div>
     
-    <!-- VR模式的A-Frame場景 -->
-    <button id="exit-vr-btn" class="exit-vr-btn">退出VR</button>
-    <a-scene id="vr-scene" embedded vr-mode-ui="enabled: true" style="display: none;" cursor="rayOrigin: mouse" raycaster="objects: .vr-hotspot">
-        <a-assets id="vr-assets">
-            <img id="vr-panorama" crossorigin="anonymous">
+    <!-- A-Frame 場景，現在作為主要查看器 -->
+    <a-scene cursor="rayOrigin: mouse" raycaster="objects: .hotspot" vr-mode-ui="enabled: false">
+        <a-assets id="assets">
+            <img id="panorama" crossorigin="anonymous">
         </a-assets>
-        <a-sky id="vr-sky" rotation="0 0 0"></a-sky>
-        <!-- 添加控制器射線 -->
-        <a-entity laser-controls="hand: right" raycaster="objects: .vr-hotspot;"></a-entity>
-        <a-entity laser-controls="hand: left" raycaster="objects: .vr-hotspot;"></a-entity>
+        <a-sky id="sky" src="#panorama" rotation="0 0 0"></a-sky>
+        <!-- 熱點容器 -->
+        <a-entity id="hotspots-container"></a-entity>
         <!-- 相機及游標 -->
-        <a-camera position="0 1.6 0">
-            <a-cursor raycaster="objects: .vr-hotspot"></a-cursor>
+        <a-camera id="camera" look-controls position="0 1.6 0">
+            <a-cursor raycaster="objects: .hotspot" color="#FFFFFF"></a-cursor>
         </a-camera>
+        <!-- VR控制器 -->
+        <a-entity laser-controls="hand: right" raycaster="objects: .hotspot;"></a-entity>
+        <a-entity laser-controls="hand: left" raycaster="objects: .hotspot;"></a-entity>
     </a-scene>
     
     <script>
-        // 使用相對路徑的房間全景圖定義（移除預設熱點）
+        // 使用相對路徑的房間全景圖定義
         const rooms = {
             living: {
                 url: "1F客廳.jpg", 
@@ -427,44 +396,36 @@
         // 熱點信息（已清空）
         const hotspotInfo = {};
         
-        // 初始化全景圖
-        let viewer;
+        // 全局變量
         let currentScene = 'living';
+        let isEditMode = false;
+        let tempHotspotEntity = null;
+        let currentHotspotData = null;
+        let selectedHotspotId = null;
         
+        // 加載場景
         function loadScene(sceneName) {
-            const scene = rooms[sceneName];
-            
             // 顯示加載圖標
             document.getElementById('loader').style.display = 'flex';
             
-            // 如果已有viewer則銷毀
-            if (viewer) {
-                viewer.destroy();
-            }
-            
-            // 創建新的viewer
-            viewer = pannellum.viewer('panorama', {
-                default: {
-                    firstScene: sceneName
-                },
-                scenes: {
-                    [sceneName]: {
-                        title: scene.title,
-                        hfov: 110,
-                        pitch: 0,
-                        yaw: 0,
-                        type: "equirectangular",
-                        panorama: scene.url,
-                        hotSpots: scene.hotSpots,
-                        hotSpotDebug: false,
-                        autoLoad: true
-                    }
-                },
-                autoLoad: true
-            });
-            
-            // 更新當前場景
+            const scene = rooms[sceneName];
             currentScene = sceneName;
+            
+            // 更新全景圖
+            const panoramaAsset = document.getElementById('panorama');
+            panoramaAsset.src = scene.url + '?t=' + new Date().getTime(); // 添加時間戳防止緩存
+            
+            // 確保圖片加載後更新天空球
+            panoramaAsset.onload = function() {
+                const sky = document.getElementById('sky');
+                sky.setAttribute('src', '#panorama');
+                
+                // 隱藏加載圖標
+                document.getElementById('loader').style.display = 'none';
+                
+                // 更新熱點
+                updateHotspots();
+            };
             
             // 更新房間選擇按鈕狀態
             document.querySelectorAll('.room-btn').forEach(btn => {
@@ -474,40 +435,130 @@
                     btn.classList.remove('active');
                 }
             });
+        }
+        
+        // 更新場景中的所有熱點
+        function updateHotspots() {
+            // 清除所有現有熱點
+            const hotspotsContainer = document.getElementById('hotspots-container');
+            while (hotspotsContainer.firstChild) {
+                hotspotsContainer.removeChild(hotspotsContainer.firstChild);
+            }
             
-            // 監聽全景圖加載完成事件
-            viewer.on('load', function() {
-                // 隱藏加載圖標
-                document.getElementById('loader').style.display = 'none';
-            });
+            // 添加當前場景的熱點
+            const sceneHotspots = rooms[currentScene].hotSpots;
+            if (sceneHotspots && sceneHotspots.length > 0) {
+                sceneHotspots.forEach(hotspot => {
+                    createHotspotEntity(hotspot);
+                });
+            }
+        }
+        
+        // 創建熱點實體
+        function createHotspotEntity(hotspot) {
+            // 將球面座標轉換為3D坐標
+            const radius = 10;
+            const phi = THREE.MathUtils.degToRad(90 - hotspot.pitch); // 垂直角度
+            const theta = THREE.MathUtils.degToRad(hotspot.yaw); // 水平角度
             
-            // 監聽熱點點擊事件
-            viewer.on('click', function(e) {
-                if (e.target.classList.contains('hotspot')) {
-                    // 如果在編輯模式下，不處理普通點擊
-                    if (isEditMode) return;
+            // 計算3D位置
+            const x = -radius * Math.sin(phi) * Math.cos(theta);
+            const y = radius * Math.cos(phi);
+            const z = -radius * Math.sin(phi) * Math.sin(theta);
+            
+            // 創建熱點實體
+            const hotspotEntity = document.createElement('a-entity');
+            hotspotEntity.classList.add('hotspot');
+            hotspotEntity.setAttribute('id', hotspot.id || 'scene-' + hotspot.sceneId);
+            hotspotEntity.setAttribute('position', `${x} ${y} ${z}`);
+            
+            // 根據熱點類型設置顏色
+            const color = hotspot.type === 'info' ? '#3498db' : '#e74c3c';
+            
+            // 創建環形熱點
+            hotspotEntity.setAttribute('geometry', 'primitive: ring; radiusInner: 0.2; radiusOuter: 0.3');
+            hotspotEntity.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9; side: double`);
+            
+            // 添加內部填充
+            const innerCircle = document.createElement('a-entity');
+            innerCircle.setAttribute('geometry', 'primitive: circle; radius: 0.18');
+            innerCircle.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.5; side: double`);
+            innerCircle.setAttribute('position', '0 0 -0.01');
+            hotspotEntity.appendChild(innerCircle);
+            
+            // 添加動畫效果
+            hotspotEntity.setAttribute('animation__scale', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
+            hotspotEntity.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true');
+            
+            // 添加文字標籤
+            const textEntity = document.createElement('a-entity');
+            textEntity.setAttribute('text', `value: ${hotspot.text}; align: center; width: 5; color: white; side: double`);
+            textEntity.setAttribute('position', '0 0.5 0');
+            textEntity.setAttribute('geometry', 'primitive: plane; width: auto; height: auto');
+            textEntity.setAttribute('material', 'color: #333; opacity: 0.7');
+            textEntity.setAttribute('look-at', '[camera]');
+            hotspotEntity.appendChild(textEntity);
+            
+            // 添加點擊事件
+            hotspotEntity.addEventListener('click', function(event) {
+                if (isEditMode) {
+                    // 在編輯模式下，點擊選擇熱點
+                    handleHotspotSelection(hotspot.id || 'scene-' + hotspot.sceneId);
+                } else {
+                    // 顯示點擊反饋
+                    this.setAttribute('material', `color: white; shader: flat; opacity: 0.9`);
+                    setTimeout(() => {
+                        this.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9`);
+                    }, 200);
                     
-                    const hotspotId = e.target.id.split('-')[0];
-                    
-                    if (hotspotInfo[hotspotId]) {
-                        // 顯示信息彈窗
-                        showInfoPopup(hotspotId);
-                    } else {
-                        // 查找場景切換熱點
-                        const scene = rooms[currentScene];
-                        const hotspot = scene.hotSpots.find(h => h.type === 'scene' && h.text.includes(hotspotId));
+                    // 正常模式下，處理熱點點擊
+                    if (hotspot.type === 'info' && hotspot.id) {
+                        showInfoPopup(hotspot.id);
+                    } else if (hotspot.type === 'scene' && hotspot.sceneId) {
+                        // 場景切換效果
+                        const sky = document.getElementById('sky');
+                        sky.setAttribute('animation', {
+                            property: 'material.opacity',
+                            from: 1,
+                            to: 0,
+                            dur: 300,
+                            easing: 'easeOutQuad'
+                        });
                         
-                        if (hotspot && hotspot.sceneId) {
+                        setTimeout(() => {
                             loadScene(hotspot.sceneId);
-                        }
+                            sky.setAttribute('animation', {
+                                property: 'material.opacity',
+                                from: 0,
+                                to: 1,
+                                dur: 300,
+                                easing: 'easeInQuad'
+                            });
+                        }, 300);
                     }
                 }
             });
+            
+            // 添加懸停效果
+            hotspotEntity.addEventListener('mouseenter', function() {
+                this.setAttribute('scale', '1.3 1.3 1.3');
+            });
+            
+            hotspotEntity.addEventListener('mouseleave', function() {
+                this.setAttribute('scale', '1 1 1');
+            });
+            
+            // 將熱點添加到容器
+            document.getElementById('hotspots-container').appendChild(hotspotEntity);
+            
+            return hotspotEntity;
         }
         
         // 顯示信息彈窗
         function showInfoPopup(hotspotId) {
             const info = hotspotInfo[hotspotId];
+            if (!info) return;
+            
             const popup = document.getElementById('info-popup');
             
             document.getElementById('popup-title').textContent = info.title;
@@ -518,103 +569,129 @@
             popup.style.display = 'block';
         }
         
-        // 編輯模式變數
-        let isEditMode = false;
-        let currentHotspotData = null;
-        let tempHotspot = null;
+        // 創建臨時熱點用於編輯
+        function createTempHotspot(position) {
+            // 如果已存在，先移除
+            if (tempHotspotEntity) {
+                tempHotspotEntity.parentNode.removeChild(tempHotspotEntity);
+            }
+            
+            // 創建新的臨時熱點
+            tempHotspotEntity = document.createElement('a-entity');
+            tempHotspotEntity.classList.add('temp-hotspot');
+            tempHotspotEntity.setAttribute('position', position.x + ' ' + position.y + ' ' + position.z);
+            tempHotspotEntity.setAttribute('geometry', 'primitive: sphere; radius: 0.3');
+            tempHotspotEntity.setAttribute('material', 'color: yellow; opacity: 0.7');
+            
+            // 添加到場景
+            document.getElementById('hotspots-container').appendChild(tempHotspotEntity);
+            
+            return tempHotspotEntity;
+        }
         
-        // 啟用/禁用編輯模式
+        // 開啟/關閉編輯模式
         function toggleEditMode() {
             isEditMode = !isEditMode;
+            
             const editorControls = document.getElementById('editor-controls');
             const editBtn = document.getElementById('edit-btn');
+            const exitEditBtn = document.getElementById('exit-edit-btn');
             
             if (isEditMode) {
+                // 開啟編輯模式
                 editorControls.style.display = 'flex';
-                editBtn.textContent = '退出編輯';
-                editBtn.classList.add('active');
+                editBtn.style.display = 'none';
+                exitEditBtn.style.display = 'inline-block';
                 
-                // 禁用場景切換
+                // 禁用房間切換
                 document.querySelectorAll('.room-btn').forEach(btn => {
                     btn.disabled = true;
                 });
                 
-                // 添加點擊監聽器用於定位熱點
-                document.getElementById('panorama').addEventListener('mousedown', handlePanoramaClick);
+                // 添加點擊場景事件
+                document.querySelector('a-scene').addEventListener('click', handleSceneClick);
             } else {
+                // 關閉編輯模式
                 editorControls.style.display = 'none';
+                editBtn.style.display = 'inline-block';
+                exitEditBtn.style.display = 'none';
                 document.getElementById('delete-hotspot-btn').style.display = 'none';
-                editBtn.textContent = '編輯模式';
-                editBtn.classList.remove('active');
                 
-                // 啟用場景切換
+                // 啟用房間切換
                 document.querySelectorAll('.room-btn').forEach(btn => {
                     btn.disabled = false;
                 });
                 
-                // 移除點擊監聽器
-                document.getElementById('panorama').removeEventListener('mousedown', handlePanoramaClick);
+                // 移除點擊場景事件
+                document.querySelector('a-scene').removeEventListener('click', handleSceneClick);
                 
                 // 移除臨時熱點
-                if (tempHotspot) {
-                    viewer.removeHotSpot(tempHotspot);
-                    tempHotspot = null;
+                if (tempHotspotEntity) {
+                    tempHotspotEntity.parentNode.removeChild(tempHotspotEntity);
+                    tempHotspotEntity = null;
                 }
             }
         }
         
-        // 處理全景圖點擊事件（編輯模式下）
-        function handlePanoramaClick(event) {
-            // 獲取點擊位置的座標
-            const coords = viewer.mouseEventToCoords(event);
-            const pitch = coords[0];
-            const yaw = coords[1];
+        // 處理場景點擊（編輯模式下）
+        function handleSceneClick(event) {
+            // 確保只在編輯模式下有效
+            if (!isEditMode) return;
             
-            console.log('Clicked at pitch: ' + pitch + ', yaw: ' + yaw);
-            
-            // 如果是選擇現有熱點，不創建新熱點
-            if (event.target.classList.contains('hotspot')) {
+            // 忽略熱點點擊
+            if (event.detail.intersectedEl && 
+                (event.detail.intersectedEl.classList.contains('hotspot') || 
+                 event.detail.intersectedEl.parentNode.classList.contains('hotspot'))) {
                 return;
             }
             
-            // 刪除之前的臨時熱點
-            if (tempHotspot) {
-                viewer.removeHotSpot(tempHotspot);
+            // 獲取點擊位置
+            if (event.detail.intersection) {
+                const point = event.detail.intersection.point;
+                
+                // 創建臨時熱點
+                createTempHotspot(point);
+                
+                // 計算球面坐標（用於保存）
+                const camera = document.getElementById('camera');
+                const cameraPos = camera.getAttribute('position');
+                
+                // 計算相對於原點的方向向量
+                const directionX = point.x;
+                const directionY = point.y;
+                const directionZ = point.z;
+                
+                // 計算球面坐標
+                const radius = Math.sqrt(directionX * directionX + directionY * directionY + directionZ * directionZ);
+                const phi = Math.acos(directionY / radius); // 垂直角度 (0 到 π)
+                const theta = Math.atan2(directionZ, directionX); // 水平角度 (-π 到 π)
+                
+                // 轉換為Pannellum格式的角度
+                const pitch = 90 - THREE.MathUtils.radToDeg(phi); // -90 到 90
+                const yaw = THREE.MathUtils.radToDeg(theta); // -180 到 180
+                
+                // 儲存當前熱點數據
+                currentHotspotData = {
+                    position: point,
+                    pitch: pitch,
+                    yaw: yaw
+                };
+                
+                // 顯示熱點表單
+                document.getElementById('hotspot-form').style.display = 'block';
             }
-            
-            // 創建臨時熱點ID
-            tempHotspot = 'temp-hotspot';
-            
-            // 添加臨時熱點到當前位置
-            viewer.addHotSpot({
-                id: tempHotspot,
-                pitch: pitch,
-                yaw: yaw,
-                type: 'info',
-                text: '新熱點',
-                cssClass: 'hotspot'
-            });
-            
-            // 存儲當前熱點數據
-            currentHotspotData = {
-                pitch: pitch,
-                yaw: yaw
-            };
-            
-            // 顯示熱點表單
-            document.getElementById('hotspot-form').style.display = 'block';
         }
         
-        // 保存所有熱點
-        function saveAllHotspots() {
-            // 將當前場景的熱點保存到rooms對象中
-            // 在真實應用中，這裡應該發送API請求將數據保存到服務器
-            alert('熱點位置已保存！在實際應用中，這裡應該將數據保存到服務器。');
-            console.log('Current hotspots:', rooms[currentScene].hotSpots);
+        // 處理熱點選擇（編輯模式下）
+        function handleHotspotSelection(hotspotId) {
+            if (!isEditMode) return;
             
-            // 將數據轉為JSON格式，方便匯出
-            const hotspotsJson = JSON.stringify(rooms[currentScene].hotSpots, null, 2);
-            console.log(hotspotsJson);
+            selectedHotspotId = hotspotId;
+            
+            // 顯示刪除按鈕
+            const deleteBtn = document.getElementById('delete-hotspot-btn');
+            deleteBtn.style.display = 'block';
+            deleteBtn.textContent = `刪除熱點: ${hotspotId}`;
         }
         
         // 添加新熱點
@@ -651,7 +728,7 @@
                     return;
                 }
                 
-                // 如果是info類型，需要在hotspotInfo中添加對應信息
+                // 添加到hotspotInfo
                 if (!hotspotInfo[id]) {
                     hotspotInfo[id] = {
                         title: text,
@@ -664,17 +741,17 @@
                 newHotspot.sceneId = sceneId;
             }
             
-            // 刪除臨時熱點
-            if (tempHotspot) {
-                viewer.removeHotSpot(tempHotspot);
-                tempHotspot = null;
-            }
-            
             // 添加到場景熱點列表
             rooms[currentScene].hotSpots.push(newHotspot);
             
-            // 重新加載場景以顯示新熱點
-            loadScene(currentScene);
+            // 重新加載熱點
+            updateHotspots();
+            
+            // 移除臨時熱點
+            if (tempHotspotEntity) {
+                tempHotspotEntity.parentNode.removeChild(tempHotspotEntity);
+                tempHotspotEntity = null;
+            }
             
             // 隱藏表單
             document.getElementById('hotspot-form').style.display = 'none';
@@ -690,333 +767,53 @@
                 if (h.type === 'info') {
                     return h.id !== selectedHotspotId;
                 } else {
-                    // 對於場景熱點，使用text進行比對
-                    return !h.text.includes(selectedHotspotId);
+                    return 'scene-' + h.sceneId !== selectedHotspotId;
                 }
             });
             
-            // 重新加載場景
-            loadScene(currentScene);
+            // 更新熱點顯示
+            updateHotspots();
             
             // 隱藏刪除按鈕
             document.getElementById('delete-hotspot-btn').style.display = 'none';
             selectedHotspotId = null;
         }
         
-        // 用於存儲當前選中的熱點ID
-        let selectedHotspotId = null;
+        // 保存所有熱點
+        function saveAllHotspots() {
+            // 在實際應用中，這裡應該將數據保存到服務器
+            alert('熱點位置已保存！在實際應用中，這裡應該將數據保存到服務器。');
+            console.log('Current hotspots:', rooms[currentScene].hotSpots);
+            
+            // 將數據轉為JSON格式，方便匯出
+            const hotspotsJson = JSON.stringify(rooms[currentScene].hotSpots, null, 2);
+            console.log(hotspotsJson);
+        }
         
-        // 在編輯模式下處理熱點點擊
-        function handleHotspotClick(e) {
-            if (!isEditMode) return;
-            
-            if (e.target.classList.contains('hotspot')) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // 獲取熱點ID
-                const hotspotId = e.target.id.split('-')[0];
-                selectedHotspotId = hotspotId;
-                
-                // 顯示刪除按鈕
-                const deleteBtn = document.getElementById('delete-hotspot-btn');
-                deleteBtn.style.display = 'block';
-                deleteBtn.textContent = `刪除熱點: ${hotspotId}`;
-            }
-        }
-
-        // WebXR VR模式相關函數
+        // 進入VR模式
         function enterVRMode() {
-            loadVRScene(currentScene);
-        }
-
-        // 新增加載VR場景的函數
-        function loadVRScene(sceneName) {
-            const scene = rooms[sceneName];
-            currentScene = sceneName; // 更新當前場景
-            
-            // 先設置場景為可見
-            document.getElementById('vr-scene').style.display = 'block';
-            document.getElementById('exit-vr-btn').style.display = 'block';
-            
-            // 設置全景圖片並確保刷新
-            const panoramaImg = document.getElementById('vr-panorama');
-            // 添加時間戳以避免緩存問題
-            panoramaImg.src = scene.url + '?t=' + new Date().getTime();
-            
-            // 強制A-Frame場景使用圖片
-            const sky = document.getElementById('vr-sky');
-            sky.setAttribute('src', '#vr-panorama');
-            
-            // 確保天空球的旋轉方向與Pannellum一致
-            // 注意：可能需要調整這些角度以匹配您的特定全景圖
-            sky.setAttribute('rotation', '0 0 0');
-            
-            console.log("VR場景載入:", scene.url);
-            
-            // 清除之前的熱點
-            const vrScene = document.querySelector('a-scene');
-            vrScene.querySelectorAll('.vr-hotspot').forEach(el => el.parentNode.removeChild(el));
-            
-            // 添加當前場景的熱點到VR場景
-            if (scene.hotSpots && scene.hotSpots.length > 0) {
-                scene.hotSpots.forEach(hotspot => {
-                    // 改進的Pannellum到A-Frame坐標轉換
-                    // Pannellum: pitch是垂直角度(-90到90)，yaw是水平角度(-180到180)
-                    // 修正坐標系統差異和初始方向
-                    
-                    // 將角度轉換為弧度
-                    const yawRad = THREE.MathUtils.degToRad(hotspot.yaw);
-                    const pitchRad = THREE.MathUtils.degToRad(hotspot.pitch);
-                    
-                    // 計算3D位置 (半徑10的球體)
-                    // 注意：這裡使用了與Pannellum更匹配的坐標轉換
-                    const radius = 10;
-                    const x = -radius * Math.sin(yawRad) * Math.cos(pitchRad);
-                    const y = radius * Math.sin(pitchRad);
-                    const z = -radius * Math.cos(yawRad) * Math.cos(pitchRad);
-                    
-                    // 創建熱點元素
-                    const hotspotEl = document.createElement('a-entity');
-                    hotspotEl.classList.add('vr-hotspot');
-                    hotspotEl.setAttribute('id', 'vr-' + (hotspot.id || hotspot.sceneId));
-                    
-                    // 設置位置
-                    hotspotEl.setAttribute('position', `${x} ${y} ${z}`);
-                    
-                    // 創建更明顯、更符合VR交互習慣的熱點
-                    let color = hotspot.type === 'info' ? '#3498db' : '#e74c3c';
-                    
-                    // 使用圓環形狀，更容易辨識且更符合VR設計
-                    hotspotEl.setAttribute('geometry', 'primitive: ring; radiusInner: 0.2; radiusOuter: 0.3');
-                    hotspotEl.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9; side: double`);
-                    
-                    // 添加內部填充，使熱點更明顯
-                    const innerCircle = document.createElement('a-entity');
-                    innerCircle.setAttribute('geometry', 'primitive: circle; radius: 0.18');
-                    innerCircle.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.5; side: double`);
-                    innerCircle.setAttribute('position', '0 0 -0.01');
-                    hotspotEl.appendChild(innerCircle);
-                    
-                    // 添加動畫效果使熱點更明顯 - 脈動效果
-                    hotspotEl.setAttribute('animation__scale', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
-                    // 添加旋轉動畫，更容易被注意到
-                    hotspotEl.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true');
-                    
-                    // 添加文字標籤，確保始終面向用戶
-                    const textEl = document.createElement('a-entity');
-                    textEl.setAttribute('text', `value: ${hotspot.text}; align: center; width: 5; color: white; side: double`);
-                    textEl.setAttribute('position', '0 0.5 0');
-                    textEl.setAttribute('geometry', 'primitive: plane; width: auto; height: auto');
-                    textEl.setAttribute('material', 'color: #333; opacity: 0.7');
-                    textEl.setAttribute('look-at', '[camera]');
-                    hotspotEl.appendChild(textEl);
-                    
-                    // 添加點擊事件
-                    hotspotEl.addEventListener('click', function() {
-                        // 添加點擊反饋 - 顏色變化
-                        this.setAttribute('material', `color: white; shader: flat; opacity: 0.9`);
-                        setTimeout(() => {
-                            this.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9`);
-                        }, 200);
-                        
-                        if (hotspot.type === 'scene' && hotspot.sceneId) {
-                            // 不退出VR，直接切換場景
-                            
-                            // 顯示過渡效果
-                            sky.setAttribute('animation', {
-                                property: 'material.opacity',
-                                from: 1,
-                                to: 0,
-                                dur: 300,
-                                easing: 'easeOutQuad'
-                            });
-                            
-                            // 等待淡出完成後加載新場景
-                            setTimeout(() => {
-                                loadVRScene(hotspot.sceneId);
-                                // 淡入新場景
-                                sky.setAttribute('animation', {
-                                    property: 'material.opacity',
-                                    from: 0,
-                                    to: 1,
-                                    dur: 300,
-                                    easing: 'easeInQuad'
-                                });
-                            }, 300);
-                        } else if (hotspot.type === 'info' && hotspot.id) {
-                            // 對於信息熱點，我們需要在VR中顯示信息
-                            // 創建一個VR內的信息面板
-                            showVRInfoPanel(hotspot.id, x, y, z);
-                        }
-                    });
-                    
-                    // 添加懸停效果（對於支援滑鼠的設備）
-                    hotspotEl.addEventListener('mouseenter', function() {
-                        this.setAttribute('scale', '1.3 1.3 1.3');
-                    });
-                    
-                    hotspotEl.addEventListener('mouseleave', function() {
-                        this.setAttribute('scale', '1 1 1');
-                    });
-                    
-                    // 將熱點添加到場景
-                    vrScene.appendChild(hotspotEl);
+            // 使用A-Frame內建的enterVR方法
+            const scene = document.querySelector('a-scene');
+            if (scene.hasLoaded) {
+                scene.enterVR();
+            } else {
+                scene.addEventListener('loaded', function() {
+                    scene.enterVR();
                 });
             }
-            
-            // 更新房間選擇按鈕狀態 (即使在VR模式下也保持同步)
-            document.querySelectorAll('.room-btn').forEach(btn => {
-                if (btn.dataset.room === sceneName) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-            
-            // 隱藏普通介面
-            document.querySelector('.container').style.display = 'none';
-            
-            // 如果這是初次進入VR，嘗試進入VR模式
-            if (!document.querySelector('a-scene').is('vr-mode')) {
-                if (vrScene.hasLoaded) {
-                    setTimeout(() => {
-                        try {
-                            vrScene.enterVR();
-                        } catch (e) {
-                            console.error("進入VR模式時發生錯誤:", e);
-                            // 如果無法進入VR模式，仍然顯示360環景
-                        }
-                    }, 1000);
-                } else {
-                    vrScene.addEventListener('loaded', function() {
-                        setTimeout(() => {
-                            try {
-                                vrScene.enterVR();
-                            } catch (e) {
-                                console.error("進入VR模式時發生錯誤:", e);
-                                // 如果無法進入VR模式，仍然顯示360環景
-                            }
-                        }, 1000);
-                    });
-                }
-            }
         }
-
-        // 在VR中顯示信息面板
-        function showVRInfoPanel(hotspotId, x, y, z) {
-            const info = hotspotInfo[hotspotId];
-            const vrScene = document.querySelector('a-scene');
-            
-            // 移除之前的信息面板
-            const oldPanel = vrScene.querySelector('#vr-info-panel');
-            if (oldPanel) {
-                oldPanel.parentNode.removeChild(oldPanel);
-            }
-            
-            // 創建信息面板容器
-            const panel = document.createElement('a-entity');
-            panel.id = 'vr-info-panel';
-            
-            // 將面板放置在熱點位置前方，保持距離
-            const cameraPosition = document.querySelector('[camera]').getAttribute('position');
-            // 計算朝向用戶的方向
-            const directionX = cameraPosition.x - x;
-            const directionY = 0; // 保持與用戶視線水平
-            const directionZ = cameraPosition.z - z;
-            
-            // 單位化方向向量
-            const length = Math.sqrt(directionX * directionX + directionZ * directionZ);
-            const normalizedX = directionX / length;
-            const normalizedZ = directionZ / length;
-            
-            // 在該方向上移動一定距離
-            const distance = 2;
-            const finalX = x + normalizedX * distance;
-            const finalZ = z + normalizedZ * distance;
-            
-            panel.setAttribute('position', `${finalX} ${y} ${finalZ}`);
-            panel.setAttribute('look-at', '[camera]');
-            
-            // 創建背景板 - 使用更友好的VR界面設計
-            const background = document.createElement('a-entity');
-            background.setAttribute('geometry', 'primitive: plane; width: 4; height: 2.5');
-            background.setAttribute('material', 'color: #2c3e50; opacity: 0.85; shader: flat; side: double');
-            background.setAttribute('position', '0 0 0');
-            background.setAttribute('rotation', '0 0 0');
-            // 添加圓角效果 (通過四個角的小圓盤實現視覺上的圓角)
-            ['1.9 1.15 0.01', '1.9 -1.15 0.01', '-1.9 1.15 0.01', '-1.9 -1.15 0.01'].forEach(pos => {
-                const corner = document.createElement('a-entity');
-                corner.setAttribute('geometry', 'primitive: circle; radius: 0.1');
-                corner.setAttribute('material', 'color: #2c3e50; opacity: 0.85; shader: flat');
-                corner.setAttribute('position', pos);
-                background.appendChild(corner);
-            });
-            panel.appendChild(background);
-            
-            // 添加標題 - 更好的排版
-            const title = document.createElement('a-entity');
-            title.setAttribute('text', `value: ${info.title}; align: center; width: 3.8; color: white; wrapCount: 30; font: default`);
-            title.setAttribute('position', '0 1 0.02');
-            panel.appendChild(title);
-            
-            // 添加描述文字 - 更好的可讀性
-            const description = document.createElement('a-entity');
-            description.setAttribute('text', `value: ${info.description}; align: left; width: 3.5; wrapCount: 40; color: white; font: default`);
-            description.setAttribute('position', '-1.75 0 0.02');
-            panel.appendChild(description);
-            
-            // 添加關閉按鈕 - 更明顯的交互元素
-            const closeBtn = document.createElement('a-entity');
-            closeBtn.setAttribute('position', '1.8 1.1 0.03');
-            closeBtn.setAttribute('geometry', 'primitive: circle; radius: 0.15');
-            closeBtn.setAttribute('material', 'color: #e74c3c; shader: flat');
-            closeBtn.setAttribute('text', 'value: X; align: center; width: 1; color: white; zOffset: 0.01');
-            closeBtn.classList.add('vr-hotspot');  // 確保可點擊
-            
-            // 添加按鈕懸停和點擊效果
-            closeBtn.addEventListener('mouseenter', function() {
-                this.setAttribute('material', 'color: #c0392b');
-            });
-            closeBtn.addEventListener('mouseleave', function() {
-                this.setAttribute('material', 'color: #e74c3c');
-            });
-            closeBtn.addEventListener('click', function() {
-                panel.setAttribute('animation', {
-                    property: 'scale',
-                    to: '0.01 0.01 0.01',
-                    dur: 200,
-                    easing: 'easeInQuad',
-                    onComplete: function() {
-                        panel.parentNode.removeChild(panel);
-                    }
-                });
-            });
-            panel.appendChild(closeBtn);
-            
-            // 添加面板到場景
-            vrScene.appendChild(panel);
-            
-            // 添加進入動畫
-            panel.setAttribute('scale', '0.01 0.01 0.01');
-            panel.setAttribute('animation', {
-                property: 'scale',
-                to: '1 1 1',
-                dur: 300,
-                easing: 'easeOutBack'
-            });
-        }
-
-        function exitVRMode() {
-            // 隱藏VR場景，顯示普通介面
-            document.getElementById('vr-scene').style.display = 'none';
-            document.getElementById('exit-vr-btn').style.display = 'none';
-            document.querySelector('.container').style.display = 'flex';
-            
-            // 確保A-Frame場景退出VR
-            const sceneEl = document.querySelector('a-scene');
-            if (sceneEl.is && sceneEl.is('vr-mode')) {
-                sceneEl.exitVR();
+        
+        // 進入全螢幕模式
+        function enterFullscreen() {
+            const scene = document.querySelector('a-scene');
+            if (scene.requestFullscreen) {
+                scene.requestFullscreen();
+            } else if (scene.mozRequestFullScreen) { // Firefox
+                scene.mozRequestFullScreen();
+            } else if (scene.webkitRequestFullscreen) { // Chrome, Safari
+                scene.webkitRequestFullscreen();
+            } else if (scene.msRequestFullscreen) { // IE/Edge
+                scene.msRequestFullscreen();
             }
         }
         
@@ -1040,60 +837,23 @@
             });
             
             // 全螢幕按鈕事件
-            document.getElementById('fullscreen-btn').addEventListener('click', function() {
-                if (viewer) {
-                    viewer.toggleFullscreen();
-                }
-            });
+            document.getElementById('fullscreen-btn').addEventListener('click', enterFullscreen);
             
-            // VR按鈕事件 - 使用WebXR
-            document.getElementById('vr-btn').addEventListener('click', function() {
-                if ('xr' in navigator) {
-                    navigator.xr.isSessionSupported('immersive-vr')
-                        .then(function(supported) {
-                            if (supported) {
-                                enterVRMode();
-                            } else {
-                                // 即使不支持沉浸式VR，也嘗試使用A-Frame提供的VR體驗
-                                console.log("設備不支持沉浸式VR，將使用A-Frame提供的VR體驗");
-                                enterVRMode();
-                            }
-                        })
-                        .catch(function(error) {
-                            console.error('WebXR檢查錯誤:', error);
-                            // 嘗試使用A-Frame直接進入
-                            enterVRMode();
-                        });
-                } else if ('getVRDisplays' in navigator) {
-                    // 舊版WebVR API (已棄用)
-                    navigator.getVRDisplays()
-                        .then(function(displays) {
-                            if (displays.length > 0) {
-                                enterVRMode();
-                            } else {
-                                // 即使沒有檢測到VR顯示，也嘗試使用A-Frame提供的VR體驗
-                                enterVRMode();
-                            }
-                        })
-                        .catch(function(error) {
-                            console.log('舊版WebVR API錯誤，將使用A-Frame提供的VR體驗');
-                            enterVRMode();
-                        });
-                } else {
-                    // 無VR支援時，仍嘗試使用A-Frame
-                    console.log('未檢測到VR支援，將使用A-Frame提供的VR體驗');
-                    enterVRMode();
-                }
-            });
-            
-            // 退出VR按鈕事件
-            document.getElementById('exit-vr-btn').addEventListener('click', exitVRMode);
+            // VR按鈕事件
+            document.getElementById('vr-btn').addEventListener('click', enterVRMode);
             
             // 編輯模式按鈕事件
             document.getElementById('edit-btn').addEventListener('click', toggleEditMode);
+            document.getElementById('exit-edit-btn').addEventListener('click', toggleEditMode);
             
             // 添加資訊熱點按鈕事件
             document.getElementById('add-info-btn').addEventListener('click', function() {
+                // 如果沒有臨時熱點，提示用戶先點擊場景
+                if (!tempHotspotEntity) {
+                    alert('請先在場景中點擊一個位置放置熱點');
+                    return;
+                }
+                
                 document.getElementById('hotspot-type').value = 'info';
                 document.getElementById('info-id-group').style.display = 'block';
                 document.getElementById('scene-id-group').style.display = 'none';
@@ -1103,6 +863,12 @@
             
             // 添加場景熱點按鈕事件
             document.getElementById('add-scene-btn').addEventListener('click', function() {
+                // 如果沒有臨時熱點，提示用戶先點擊場景
+                if (!tempHotspotEntity) {
+                    alert('請先在場景中點擊一個位置放置熱點');
+                    return;
+                }
+                
                 document.getElementById('hotspot-type').value = 'scene';
                 document.getElementById('info-id-group').style.display = 'none';
                 document.getElementById('scene-id-group').style.display = 'block';
@@ -1128,9 +894,9 @@
             // 取消添加熱點按鈕事件
             document.getElementById('cancel-hotspot-btn').addEventListener('click', function() {
                 document.getElementById('hotspot-form').style.display = 'none';
-                if (tempHotspot) {
-                    viewer.removeHotSpot(tempHotspot);
-                    tempHotspot = null;
+                if (tempHotspotEntity) {
+                    tempHotspotEntity.parentNode.removeChild(tempHotspotEntity);
+                    tempHotspotEntity = null;
                 }
                 currentHotspotData = null;
             });
@@ -1141,8 +907,19 @@
             // 刪除熱點按鈕事件
             document.getElementById('delete-hotspot-btn').addEventListener('click', deleteSelectedHotspot);
             
-            // 為全景圖添加熱點點擊事件（用於編輯模式）
-            document.getElementById('panorama').addEventListener('click', handleHotspotClick);
+            // 檢測WebXR支援
+            if (navigator.xr) {
+                navigator.xr.isSessionSupported('immersive-vr')
+                    .then(function(supported) {
+                        if (!supported) {
+                            document.getElementById('vr-btn').textContent = 'VR模式 (受限)';
+                            document.getElementById('vr-btn').title = '您的設備不支援完全沉浸式VR，但仍可使用簡易VR模式';
+                        }
+                    });
+            } else {
+                document.getElementById('vr-btn').textContent = 'VR模式 (受限)';
+                document.getElementById('vr-btn').title = '您的瀏覽器不支援WebXR，但仍可使用簡易VR模式';
+            }
         });
     </script>
 </body>
