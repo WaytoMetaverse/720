@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A-Frame 房地產環景導覽平台</title>
-    <!-- 只保留 A-Frame -->
+    <title>多房間環景導覽平台</title>
+    <!-- A-Frame 框架 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
-    <!-- 添加 Three.js 用於數學計算 -->
+    <!-- Three.js 用於數學計算 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * {
@@ -63,6 +63,10 @@
         
         .btn:hover {
             background-color: #2980b9;
+        }
+        
+        .btn.active {
+            background-color: #16a085;
         }
         
         .vr-btn {
@@ -209,14 +213,6 @@
             display: none;
         }
         
-        .edit-mode {
-            background-color: #f39c12;
-        }
-        
-        .edit-mode:hover {
-            background-color: #d35400;
-        }
-        
         .hotspot-form {
             position: fixed;
             top: 50%;
@@ -260,9 +256,99 @@
             margin-top: 1rem;
         }
         
-        /* 隱藏 A-Frame 默認的 VR 按鈕，我們使用自己的 UI */
+        /* 隱藏 A-Frame 默認的 VR 按鈕，使用自定義 UI */
         .a-enter-vr {
             display: none !important;
+        }
+        
+        /* 連接圖顯示樣式 */
+        .connection-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+        
+        .connection-modal h2 {
+            color: white;
+            margin-bottom: 1.5rem;
+        }
+        
+        .connection-map {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+        
+        .room-card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .room-card h3 {
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 0.5rem;
+        }
+        
+        .room-card h4 {
+            margin: 1rem 0 0.5rem;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        .room-card ul {
+            list-style-type: none;
+            padding-left: 0.5rem;
+        }
+        
+        .room-card li {
+            margin-bottom: 0.3rem;
+            font-size: 0.9rem;
+        }
+        
+        .connection-modal .btn {
+            margin-top: 1.5rem;
+        }
+        
+        /* 導航輔助 */
+        .nav-helper {
+            position: fixed;
+            bottom: 5rem;
+            right: 1rem;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 0.8rem;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            max-width: 200px;
+            font-size: 0.9rem;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-helper h4 {
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+        
+        .nav-helper p {
+            margin-bottom: 0.5rem;
+            color: #34495e;
         }
     </style>
 </head>
@@ -271,10 +357,12 @@
         <header>
             <div class="logo">房地產環景導覽</div>
             <div class="controls">
+                <button class="btn" id="map-btn">連接圖</button>
                 <button class="btn" id="fullscreen-btn">全螢幕</button>
                 <button class="btn vr-btn" id="vr-btn">VR模式</button>
-                <button class="btn edit-mode" id="edit-btn">編輯模式</button>
+                <button class="btn" id="edit-btn">編輯模式</button>
                 <button class="btn" id="exit-edit-btn" style="display: none;">退出編輯</button>
+                <button class="btn" id="help-btn">幫助</button>
             </div>
         </header>
         
@@ -284,6 +372,7 @@
             <p><strong>格局:</strong> 4房2廳2衛</p>
             <p><strong>樓層:</strong> 1-4F/RF</p>
             <p><strong>地址:</strong> 維次宇宙</p>
+            <p id="current-room"></p>
         </div>
         
         <div class="room-selector">
@@ -305,7 +394,9 @@
         <div class="editor-controls" id="editor-controls">
             <button class="btn" id="add-info-btn">添加資訊熱點</button>
             <button class="btn" id="add-scene-btn">添加場景熱點</button>
+            <button class="btn" id="add-center-btn">中央添加熱點</button>
             <button class="btn" id="save-hotspots-btn">保存熱點</button>
+            <button class="btn" id="check-connections-btn">檢查連接</button>
             <button class="btn" id="delete-hotspot-btn" style="display: none;">刪除熱點</button>
         </div>
         
@@ -344,6 +435,8 @@
                     <option value="bathroom">浴室</option>
                     <option value="balcony">陽台</option>
                 </select>
+                <label for="direction-hint" style="margin-top:10px">方向提示</label>
+                <input type="text" id="direction-hint" placeholder="例如：上樓、回客廳">
             </div>
             <div class="form-actions">
                 <button class="btn" id="cancel-hotspot-btn">取消</button>
@@ -351,11 +444,16 @@
             </div>
         </div>
         
+        <div class="nav-helper" id="nav-helper" style="display:none">
+            <h4>導航輔助</h4>
+            <p id="nav-helper-text"></p>
+        </div>
+        
         <div class="loader" id="loader"></div>
     </div>
     
-    <!-- A-Frame 場景，現在作為主要查看器 -->
-    <a-scene cursor="rayOrigin: mouse" raycaster="objects: .hotspot" vr-mode-ui="enabled: false">
+    <!-- A-Frame 場景 -->
+    <a-scene cursor="rayOrigin: mouse" raycaster="objects: .hotspot, a-sky" vr-mode-ui="enabled: false">
         <a-assets id="assets">
             <img id="panorama" crossorigin="anonymous">
         </a-assets>
@@ -372,42 +470,86 @@
     </a-scene>
     
     <script>
-        // 使用相對路徑的房間全景圖定義
+        // 房間定義
         const rooms = {
             living: {
                 url: "1F客廳.jpg", 
                 title: "寬敞客廳",
+                displayName: "客廳",
+                description: "明亮寬敞的客廳空間，是家人共聚的理想場所。",
                 hotSpots: []
             },
             kitchen: {
                 url: "1F餐廳.jpg", 
                 title: "餐廳",
+                displayName: "餐廳",
+                description: "舒適的用餐空間，能容納全家人共享美食時光。",
                 hotSpots: []
             },
             master: {
                 url: "2F臥室.jpg", 
-                title: "臥室",
+                title: "主臥室",
+                displayName: "2F主臥室",
+                description: "寬敞舒適的主臥室，擁有充足的自然光線。",
                 hotSpots: []
             },
             bedroom: {
                 url: "3F臥室1.jpg", 
                 title: "次臥",
+                displayName: "3F臥室",
+                description: "功能齊全的次臥室，適合客人或孩子使用。",
                 hotSpots: []
             },
             bathroom: {
                 url: "2F浴室.jpg", 
                 title: "浴室",
+                displayName: "浴室",
+                description: "現代化的衛浴空間，提供舒適的沐浴體驗。",
                 hotSpots: []
             },
             balcony: {
                 url: "RF陽台.jpg", 
                 title: "陽台",
+                displayName: "頂樓陽台",
+                description: "寬敞的頂樓陽台，可眺望周圍美麗景色。",
                 hotSpots: []
             }
         };
         
-        // 熱點信息（已清空）
+        // 熱點信息存儲
         const hotspotInfo = {};
+        
+        // 推薦熱點配置
+        const recommendedHotspots = {
+            living: [
+                {type: 'scene', target: 'kitchen', position: '右側/前方', text: '前往餐廳'},
+                {type: 'scene', target: 'master', position: '樓梯/後方', text: '上樓到2F'},
+                {type: 'info', id: 'living-sofa', text: '客廳沙發', title: '舒適沙發組', description: '高品質義大利進口真皮沙發，舒適耐用，可容納全家人。'}
+            ],
+            kitchen: [
+                {type: 'scene', target: 'living', position: '左側/出口', text: '回到客廳'},
+                {type: 'info', id: 'kitchen-table', text: '餐桌', title: '六人餐桌', description: '實木六人餐桌，是家人共享美食時光的理想場所。'}
+            ],
+            master: [
+                {type: 'scene', target: 'living', position: '樓梯/出口', text: '下樓回客廳'},
+                {type: 'scene', target: 'bathroom', position: '右側/附近', text: '前往浴室'},
+                {type: 'scene', target: 'bedroom', position: '樓梯/走廊', text: '上樓到3F'},
+                {type: 'info', id: 'master-bed', text: '主臥床組', title: '雙人床', description: '高品質雙人床組，搭配舒適床墊，確保良好的睡眠品質。'}
+            ],
+            bedroom: [
+                {type: 'scene', target: 'master', position: '樓梯/出口', text: '下樓到2F'},
+                {type: 'scene', target: 'balcony', position: '窗戶/陽台門', text: '前往頂樓陽台'},
+                {type: 'info', id: 'bedroom-desk', text: '書桌', title: '工作書桌', description: '功能實用的工作書桌，適合在家辦公或學習使用。'}
+            ],
+            bathroom: [
+                {type: 'scene', target: 'master', position: '門口/出口', text: '回到臥室'},
+                {type: 'info', id: 'bathroom-shower', text: '淋浴間', title: '淋浴設備', description: '現代化淋浴設備，提供舒適的沐浴體驗。'}
+            ],
+            balcony: [
+                {type: 'scene', target: 'bedroom', position: '門口/入口', text: '回到3F臥室'},
+                {type: 'info', id: 'balcony-view', text: '景觀', title: '城市景觀', description: '從頂樓陽台可以欣賞到絕佳的城市景觀。'}
+            ]
+        };
         
         // 全局變量
         let currentScene = 'living';
@@ -416,13 +558,26 @@
         let currentHotspotData = null;
         let selectedHotspotId = null;
         
+        // 獲取房間顯示名稱
+        function getRoomDisplayName(roomId) {
+            return rooms[roomId] ? rooms[roomId].displayName : roomId;
+        }
+        
         // 加載場景
         function loadScene(sceneName) {
+            if (!rooms[sceneName]) {
+                console.error('場景不存在:', sceneName);
+                return;
+            }
+            
             // 顯示加載圖標
             document.getElementById('loader').style.display = 'flex';
             
             const scene = rooms[sceneName];
             currentScene = sceneName;
+            
+            // 更新當前房間信息
+            document.getElementById('current-room').textContent = '當前位置: ' + scene.displayName;
             
             // 更新全景圖
             const panoramaAsset = document.getElementById('panorama');
@@ -438,6 +593,9 @@
                 
                 // 更新熱點
                 updateHotspots();
+                
+                // 顯示導航輔助
+                showNavigationHelper(sceneName);
             };
             
             // 更新房間選擇按鈕狀態
@@ -448,6 +606,36 @@
                     btn.classList.remove('active');
                 }
             });
+        }
+        
+        // 顯示導航輔助
+        function showNavigationHelper(sceneName) {
+            const navHelper = document.getElementById('nav-helper');
+            const navText = document.getElementById('nav-helper-text');
+            
+            // 找出可用的出口
+            const exits = rooms[sceneName].hotSpots.filter(h => h.type === 'scene');
+            
+            if (exits.length > 0) {
+                let text = '可用出口: ';
+                exits.forEach((exit, index) => {
+                    text += exit.text;
+                    if (index < exits.length - 1) text += ', ';
+                });
+                navText.textContent = text;
+                navHelper.style.display = 'block';
+                
+                // 5秒後自動隱藏
+                setTimeout(() => {
+                    navHelper.style.opacity = '0';
+                    setTimeout(() => {
+                        navHelper.style.display = 'none';
+                        navHelper.style.opacity = '1';
+                    }, 500);
+                }, 5000);
+            } else {
+                navHelper.style.display = 'none';
+            }
         }
         
         // 更新場景中的所有熱點
@@ -695,9 +883,98 @@
                 document.getElementById('hotspot-id').value = '';
                 document.getElementById('info-title').value = '';
                 document.getElementById('info-desc').value = '';
+                document.getElementById('direction-hint').value = '';
                 
                 // 顯示熱點表單
                 document.getElementById('hotspot-form').style.display = 'block';
+            }
+        }
+        
+        // 處理中央添加熱點
+        function handleCenterHotspot() {
+            // 獲取相機位置和方向
+            const camera = document.getElementById('camera');
+            const cameraRotation = camera.getAttribute('rotation');
+            
+            // 計算相機前方的點
+            const rad = THREE.MathUtils.degToRad(-cameraRotation.y);
+            const x = -10 * Math.sin(rad);
+            const y = 10 * Math.tan(THREE.MathUtils.degToRad(cameraRotation.x));
+            const z = -10 * Math.cos(rad);
+            
+            // 創建熱點
+            const point = {x: x, y: y, z: z};
+            createTempHotspot(point);
+            
+            // 計算球面坐標
+            const radius = Math.sqrt(x*x + y*y + z*z);
+            const phi = Math.acos(y / radius);
+            const theta = Math.atan2(z, x);
+            
+            const pitch = 90 - THREE.MathUtils.radToDeg(phi);
+            const yaw = THREE.MathUtils.radToDeg(theta);
+            
+            currentHotspotData = {
+                position: point,
+                pitch: pitch,
+                yaw: yaw
+            };
+            
+            // 基於當前房間推薦熱點
+            suggestHotspot();
+            
+            // 顯示熱點表單
+            document.getElementById('hotspot-form').style.display = 'block';
+        }
+        
+        // 推薦熱點設置
+        function suggestHotspot() {
+            const recommendations = recommendedHotspots[currentScene];
+            if (!recommendations || recommendations.length === 0) return;
+            
+            // 找到尚未實現的推薦熱點
+            const existingSceneHotspots = rooms[currentScene].hotSpots
+                .filter(h => h.type === 'scene')
+                .map(h => h.sceneId);
+                
+            const existingInfoHotspots = rooms[currentScene].hotSpots
+                .filter(h => h.type === 'info')
+                .map(h => h.id);
+                
+            const pendingRecommendations = recommendations.filter(rec => {
+                if (rec.type === 'scene') {
+                    return !existingSceneHotspots.includes(rec.target);
+                } else {
+                    return !existingInfoHotspots.includes(rec.id);
+                }
+            });
+            
+            if (pendingRecommendations.length === 0) return;
+            
+            // 使用第一個推薦
+            const recommendation = pendingRecommendations[0];
+            
+            // 填充表單
+            document.getElementById('hotspot-type').value = recommendation.type;
+            document.getElementById('hotspot-text').value = recommendation.text;
+            
+            if (recommendation.type === 'info') {
+                document.getElementById('info-id-group').style.display = 'block';
+                document.getElementById('info-title-group').style.display = 'block';
+                document.getElementById('info-desc-group').style.display = 'block';
+                document.getElementById('scene-id-group').style.display = 'none';
+                
+                document.getElementById('hotspot-id').value = recommendation.id;
+                document.getElementById('info-title').value = recommendation.title || recommendation.text;
+                document.getElementById('info-desc').value = recommendation.description || '';
+            } else {
+                document.getElementById('info-id-group').style.display = 'none';
+                document.getElementById('info-title-group').style.display = 'none';
+                document.getElementById('info-desc-group').style.display = 'none';
+                document.getElementById('scene-id-group').style.display = 'block';
+                
+                document.getElementById('scene-id').value = recommendation.target;
+                document.getElementById('direction-hint').value = recommendation.text;
             }
         }
         
@@ -749,8 +1026,8 @@
                 
                 // 獲取信息標題和描述
                 const infoTitle = document.getElementById('info-title').value || text;
-                const infoDesc = document.getElementById('info-desc').value || "請在此處添加描述";
-
+                const infoDesc = document.getElementById('info-desc').value || "尚無詳細描述";
+                
                 // 添加到hotspotInfo
                 hotspotInfo[id] = {
                     title: infoTitle,
@@ -760,6 +1037,12 @@
             } else if (type === 'scene') {
                 const sceneId = document.getElementById('scene-id').value;
                 newHotspot.sceneId = sceneId;
+                
+                // 添加方向提示
+                const directionHint = document.getElementById('direction-hint').value;
+                if (directionHint) {
+                    newHotspot.text = directionHint;
+                }
             }
             
             // 添加到場景熱點列表
@@ -798,6 +1081,122 @@
             // 隱藏刪除按鈕
             document.getElementById('delete-hotspot-btn').style.display = 'none';
             selectedHotspotId = null;
+        }
+        
+        // 檢查連接
+        function checkConnections() {
+            const missingConnections = [];
+            
+            // 檢查每個房間的基本連接
+            Object.keys(rooms).forEach(roomId => {
+                const roomHotspots = rooms[roomId].hotSpots;
+                const outgoingConnections = roomHotspots
+                    .filter(h => h.type === 'scene')
+                    .map(h => h.sceneId);
+                
+                // 檢查此房間有沒有連出去的路徑
+                if (outgoingConnections.length === 0) {
+                    missingConnections.push(`${getRoomDisplayName(roomId)} 沒有任何出口`);
+                }
+                
+                // 檢查此房間是否被其他房間連接
+                const isConnectedFrom = Object.keys(rooms).some(otherRoomId => {
+                    if (otherRoomId === roomId) return false;
+                    return rooms[otherRoomId].hotSpots.some(h => 
+                        h.type === 'scene' && h.sceneId === roomId
+                    );
+                });
+                
+                if (!isConnectedFrom) {
+                    missingConnections.push(`沒有任何房間連接到 ${getRoomDisplayName(roomId)}`);
+                }
+            });
+            
+            // 顯示結果
+            if (missingConnections.length === 0) {
+                alert('所有房間連接正常！');
+            } else {
+                alert('發現連接問題:\n\n' + missingConnections.join('\n'));
+            }
+        }
+        
+        // 顯示連接圖
+        function showConnectionMap() {
+            // 創建連接圖
+            const connections = {};
+            
+            Object.keys(rooms).forEach(roomId => {
+                connections[roomId] = {
+                    name: getRoomDisplayName(roomId),
+                    outgoing: [],
+                    incoming: []
+                };
+                
+                // 添加出站連接
+                rooms[roomId].hotSpots.forEach(hotspot => {
+                    if (hotspot.type === 'scene' && hotspot.sceneId) {
+                        connections[roomId].outgoing.push({
+                            to: hotspot.sceneId,
+                            text: hotspot.text
+                        });
+                    }
+                });
+            });
+            
+            // 填充入站連接
+            Object.keys(connections).forEach(roomId => {
+                Object.keys(connections).forEach(otherRoomId => {
+                    connections[otherRoomId].outgoing.forEach(conn => {
+                        if (conn.to === roomId) {
+                            connections[roomId].incoming.push({
+                                from: otherRoomId,
+                                text: conn.text
+                            });
+                        }
+                    });
+                });
+            });
+            
+            // 顯示連接圖
+            let html = '<h2>房間連接關係</h2><div class="connection-map">';
+            
+            Object.keys(connections).forEach(roomId => {
+                const room = connections[roomId];
+                html += `<div class="room-card">
+                    <h3>${room.name}</h3>
+                    <div class="outgoing">
+                        <h4>出站連接:</h4>
+                        <ul>
+                            ${room.outgoing.map(conn => 
+                                `<li>→ ${getRoomDisplayName(conn.to)} (${conn.text})</li>`).join('') || '<li>無</li>'}
+                        </ul>
+                    </div>
+                    <div class="incoming">
+                        <h4>入站連接:</h4>
+                        <ul>
+                            ${room.incoming.map(conn => 
+                                `<li>← ${getRoomDisplayName(conn.from)} (${conn.text})</li>`).join('') || '<li>無</li>'}
+                        </ul>
+                    </div>
+                </div>`;
+            });
+            
+            html += '</div>';
+            
+            // 在模態對話框中顯示
+            const modalDiv = document.createElement('div');
+            modalDiv.className = 'connection-modal';
+            modalDiv.innerHTML = html;
+            document.body.appendChild(modalDiv);
+            
+            // 添加關閉按鈕
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '關閉';
+            closeBtn.className = 'btn';
+            closeBtn.addEventListener('click', () => {
+                document.body.removeChild(modalDiv);
+            });
+            modalDiv.appendChild(closeBtn);
         }
         
         // =========== 熱點數據保存與載入功能 ===========
@@ -875,9 +1274,6 @@
                     console.log('熱點數據載入提示:', error.message);
                     // 隱藏加載圖標
                     document.getElementById('loader').style.display = 'none';
-                    
-                    // 如果是首次使用，這是正常的，因此不顯示錯誤提示
-                    // 只在控制台顯示信息
                 });
         }
         
@@ -908,6 +1304,49 @@
             }
         }
         
+        // 顯示幫助信息
+        function showHelp() {
+            const helpContent = `
+                <h2>環景導覽平台使用幫助</h2>
+                
+                <h3>基本導覽</h3>
+                <p>- 使用滑鼠拖動或觸控滑動來環顧四周</p>
+                <p>- 點擊藍色熱點查看詳細信息</p>
+                <p>- 點擊紅色熱點可以切換到其他房間</p>
+                <p>- 底部的房間選擇器可以直接跳轉到指定房間</p>
+                
+                <h3>VR模式</h3>
+                <p>- 點擊「VR模式」按鈕進入VR體驗</p>
+                <p>- 在VR模式中使用控制器指向熱點並點擊進行互動</p>
+                <p>- 也可以在手機上使用簡易VR模式，配合Google Cardboard等設備</p>
+                
+                <h3>編輯模式（需要密碼）</h3>
+                <p>- 在編輯模式下可以添加、刪除熱點</p>
+                <p>- 點擊場景中的位置可以放置熱點</p>
+                <p>- 也可以使用「中央添加熱點」在視線中心添加熱點</p>
+                <p>- 完成編輯後請保存熱點數據</p>
+                
+                <h3>連接圖</h3>
+                <p>- 點擊「連接圖」按鈕可以查看所有房間之間的連接關係</p>
+                <p>- 使用連接圖確保導覽路徑完整，沒有死胡同</p>
+            `;
+            
+            // 在模態對話框中顯示
+            const modalDiv = document.createElement('div');
+            modalDiv.className = 'connection-modal';
+            modalDiv.innerHTML = helpContent;
+            document.body.appendChild(modalDiv);
+            
+            // 添加關閉按鈕
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '關閉';
+            closeBtn.className = 'btn';
+            closeBtn.addEventListener('click', () => {
+                document.body.removeChild(modalDiv);
+            });
+            modalDiv.appendChild(closeBtn);
+        }
+        
         // 在文檔加載完成後初始化
         document.addEventListener('DOMContentLoaded', function() {
             // 從 JSON 文件加載熱點數據（如果存在）
@@ -936,11 +1375,17 @@
             // VR按鈕事件
             document.getElementById('vr-btn').addEventListener('click', enterVRMode);
             
+            // 連接圖按鈕事件
+            document.getElementById('map-btn').addEventListener('click', showConnectionMap);
+            
+            // 幫助按鈕事件
+            document.getElementById('help-btn').addEventListener('click', showHelp);
+            
             // 編輯模式按鈕事件 - 添加簡單的密碼保護
             document.getElementById('edit-btn').addEventListener('click', function() {
-                const password = prompt('請輸入編輯模式密碼（默認: admin）:');
+                const password = prompt('請輸入編輯模式密碼（預設: admin）:');
                 
-                // 設置一個簡單的密碼（在實際應用中應該使用更安全的方法）
+                // 設置一個簡單的密碼
                 if (password === 'admin') {
                     toggleEditMode();
                 } else {
@@ -984,8 +1429,14 @@
                 document.getElementById('hotspot-form').style.display = 'block';
             });
             
+            // 中央添加熱點按鈕事件
+            document.getElementById('add-center-btn').addEventListener('click', handleCenterHotspot);
+            
             // 保存熱點按鈕事件
             document.getElementById('save-hotspots-btn').addEventListener('click', saveAllHotspots);
+            
+            // 檢查連接按鈕事件
+            document.getElementById('check-connections-btn').addEventListener('click', checkConnections);
             
             // 熱點類型切換事件
             document.getElementById('hotspot-type').addEventListener('change', function() {
@@ -1018,6 +1469,24 @@
             
             // 刪除熱點按鈕事件
             document.getElementById('delete-hotspot-btn').addEventListener('click', deleteSelectedHotspot);
+            
+            // 添加全局鍵盤快捷鍵
+            document.addEventListener('keydown', function(event) {
+                // 只在編輯模式下有效
+                if (!isEditMode) return;
+                
+                // Space鍵：在視線中心添加熱點
+                if (event.code === 'Space') {
+                    handleCenterHotspot();
+                }
+                
+                // Escape鍵：關閉表單
+                if (event.code === 'Escape') {
+                    if (document.getElementById('hotspot-form').style.display === 'block') {
+                        document.getElementById('cancel-hotspot-btn').click();
+                    }
+                }
+            });
             
             // 檢測WebXR支援
             if (navigator.xr) {
