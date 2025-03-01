@@ -242,11 +242,16 @@
             color: #2c3e50;
         }
         
-        .form-group input, .form-group select {
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
             padding: 0.5rem;
             border: 1px solid #ddd;
             border-radius: 4px;
+        }
+        
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
         }
         
         .form-actions {
@@ -320,6 +325,14 @@
             <div class="form-group" id="info-id-group">
                 <label for="hotspot-id">熱點ID</label>
                 <input type="text" id="hotspot-id" placeholder="輸入唯一ID">
+            </div>
+            <div class="form-group" id="info-title-group">
+                <label for="info-title">資訊標題</label>
+                <input type="text" id="info-title" placeholder="輸入資訊標題">
+            </div>
+            <div class="form-group" id="info-desc-group">
+                <label for="info-desc">資訊描述</label>
+                <textarea id="info-desc" placeholder="輸入詳細描述"></textarea>
             </div>
             <div class="form-group" id="scene-id-group" style="display: none;">
                 <label for="scene-id">目標場景</label>
@@ -677,6 +690,12 @@
                     yaw: yaw
                 };
                 
+                // 清空表單
+                document.getElementById('hotspot-text').value = '';
+                document.getElementById('hotspot-id').value = '';
+                document.getElementById('info-title').value = '';
+                document.getElementById('info-desc').value = '';
+                
                 // 顯示熱點表單
                 document.getElementById('hotspot-form').style.display = 'block';
             }
@@ -728,14 +747,16 @@
                     return;
                 }
                 
+                // 獲取信息標題和描述
+                const infoTitle = document.getElementById('info-title').value || text;
+                const infoDesc = document.getElementById('info-desc').value || "請在此處添加描述";
+
                 // 添加到hotspotInfo
-                if (!hotspotInfo[id]) {
-                    hotspotInfo[id] = {
-                        title: text,
-                        img: rooms[currentScene].url,
-                        description: "請在此處添加描述"
-                    };
-                }
+                hotspotInfo[id] = {
+                    title: infoTitle,
+                    img: rooms[currentScene].url,
+                    description: infoDesc
+                };
             } else if (type === 'scene') {
                 const sceneId = document.getElementById('scene-id').value;
                 newHotspot.sceneId = sceneId;
@@ -779,15 +800,85 @@
             selectedHotspotId = null;
         }
         
-        // 保存所有熱點
+        // =========== 熱點數據保存與載入功能 ===========
+        
+        // 保存所有熱點為 JSON 文件
         function saveAllHotspots() {
-            // 在實際應用中，這裡應該將數據保存到服務器
-            alert('熱點位置已保存！在實際應用中，這裡應該將數據保存到服務器。');
-            console.log('Current hotspots:', rooms[currentScene].hotSpots);
+            // 收集所有房間的熱點數據
+            const allData = {};
             
-            // 將數據轉為JSON格式，方便匯出
-            const hotspotsJson = JSON.stringify(rooms[currentScene].hotSpots, null, 2);
-            console.log(hotspotsJson);
+            Object.keys(rooms).forEach(scene => {
+                allData[scene] = {
+                    hotSpots: rooms[scene].hotSpots
+                };
+            });
+            
+            // 也保存所有的熱點信息
+            allData.hotspotInfo = hotspotInfo;
+            
+            // 轉換為格式化的 JSON 字符串
+            const dataStr = JSON.stringify(allData, null, 2);
+            
+            // 創建一個可下載的 data URI
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            // 創建一個隱藏的下載連結
+            const exportLink = document.createElement('a');
+            exportLink.setAttribute('href', dataUri);
+            exportLink.setAttribute('download', 'panorama-hotspots.json');
+            document.body.appendChild(exportLink);
+            
+            // 自動點擊下載連結
+            exportLink.click();
+            
+            // 清理 DOM
+            document.body.removeChild(exportLink);
+            
+            // 通知用戶
+            alert('熱點數據已導出為 JSON 文件。請將此文件上傳到您的網站根目錄，替換現有的 panorama-hotspots.json 文件。');
+        }
+        
+        // 從 JSON 文件加載熱點
+        function loadHotspotsFromJSON() {
+            // 顯示加載圖標
+            document.getElementById('loader').style.display = 'flex';
+            
+            fetch('panorama-hotspots.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('未找到熱點數據文件');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('成功加載熱點數據');
+                    
+                    // 更新熱點信息
+                    if (data.hotspotInfo) {
+                        Object.assign(hotspotInfo, data.hotspotInfo);
+                    }
+                    
+                    // 更新房間熱點數據
+                    Object.keys(data).forEach(key => {
+                        if (key !== 'hotspotInfo' && rooms[key] && data[key].hotSpots) {
+                            rooms[key].hotSpots = data[key].hotSpots;
+                        }
+                    });
+                    
+                    // 更新當前場景的熱點顯示
+                    updateHotspots();
+                    
+                    // 隱藏加載圖標
+                    document.getElementById('loader').style.display = 'none';
+                })
+                .catch(error => {
+                    console.log('熱點數據載入提示:', error.message);
+                    // 隱藏加載圖標
+                    document.getElementById('loader').style.display = 'none';
+                    
+                    // 如果是首次使用，這是正常的，因此不顯示錯誤提示
+                    // 只在控制台顯示信息
+                });
         }
         
         // 進入VR模式
@@ -819,6 +910,9 @@
         
         // 在文檔加載完成後初始化
         document.addEventListener('DOMContentLoaded', function() {
+            // 從 JSON 文件加載熱點數據（如果存在）
+            loadHotspotsFromJSON();
+            
             // 加載初始場景
             loadScene('living');
             
@@ -842,8 +936,18 @@
             // VR按鈕事件
             document.getElementById('vr-btn').addEventListener('click', enterVRMode);
             
-            // 編輯模式按鈕事件
-            document.getElementById('edit-btn').addEventListener('click', toggleEditMode);
+            // 編輯模式按鈕事件 - 添加簡單的密碼保護
+            document.getElementById('edit-btn').addEventListener('click', function() {
+                const password = prompt('請輸入編輯模式密碼（默認: admin）:');
+                
+                // 設置一個簡單的密碼（在實際應用中應該使用更安全的方法）
+                if (password === 'admin') {
+                    toggleEditMode();
+                } else {
+                    alert('密碼錯誤，無法進入編輯模式');
+                }
+            });
+            
             document.getElementById('exit-edit-btn').addEventListener('click', toggleEditMode);
             
             // 添加資訊熱點按鈕事件
@@ -856,6 +960,8 @@
                 
                 document.getElementById('hotspot-type').value = 'info';
                 document.getElementById('info-id-group').style.display = 'block';
+                document.getElementById('info-title-group').style.display = 'block';
+                document.getElementById('info-desc-group').style.display = 'block';
                 document.getElementById('scene-id-group').style.display = 'none';
                 document.getElementById('form-title').textContent = '添加資訊熱點';
                 document.getElementById('hotspot-form').style.display = 'block';
@@ -871,6 +977,8 @@
                 
                 document.getElementById('hotspot-type').value = 'scene';
                 document.getElementById('info-id-group').style.display = 'none';
+                document.getElementById('info-title-group').style.display = 'none';
+                document.getElementById('info-desc-group').style.display = 'none';
                 document.getElementById('scene-id-group').style.display = 'block';
                 document.getElementById('form-title').textContent = '添加場景切換熱點';
                 document.getElementById('hotspot-form').style.display = 'block';
@@ -884,9 +992,13 @@
                 const type = this.value;
                 if (type === 'info') {
                     document.getElementById('info-id-group').style.display = 'block';
+                    document.getElementById('info-title-group').style.display = 'block';
+                    document.getElementById('info-desc-group').style.display = 'block';
                     document.getElementById('scene-id-group').style.display = 'none';
                 } else {
                     document.getElementById('info-id-group').style.display = 'none';
+                    document.getElementById('info-title-group').style.display = 'none';
+                    document.getElementById('info-desc-group').style.display = 'none';
                     document.getElementById('scene-id-group').style.display = 'block';
                 }
             });
