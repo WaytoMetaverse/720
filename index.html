@@ -98,6 +98,11 @@
             padding: 5px;
             border-radius: 5px;
         }
+        .loader-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
@@ -106,6 +111,10 @@
         <div class="loader-text" id="loader-text">加載全景圖像中...</div>
         <div class="loader-progress">
             <div class="loader-progress-bar" id="progress-bar"></div>
+        </div>
+        <div class="loader-buttons">
+            <button class="btn" id="use-default-btn">使用默認全景</button>
+            <button class="btn" id="close-loader-btn">強制關閉</button>
         </div>
     </div>
     
@@ -129,12 +138,21 @@
         
         <!-- 預加載資源 -->
         <a-assets>
+            <!-- 外部資源 -->
             <img id="img-front" src="front.jpg" crossorigin="anonymous">
             <img id="img-back" src="back.jpg" crossorigin="anonymous">
             <img id="img-right" src="right.jpg" crossorigin="anonymous">
             <img id="img-left" src="left.jpg" crossorigin="anonymous">
             <img id="img-top" src="top.jpg" crossorigin="anonymous">
             <img id="img-bottom" src="down.jpg" crossorigin="anonymous">
+            
+            <!-- 默認資源（一定能夠加載的CDN資源） -->
+            <img id="default-front" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-front.jpg?v=1618503405959" crossorigin="anonymous">
+            <img id="default-back" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-back.jpg?v=1618503404412" crossorigin="anonymous">
+            <img id="default-right" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-right.jpg?v=1618503407956" crossorigin="anonymous">
+            <img id="default-left" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-left.jpg?v=1618503407150" crossorigin="anonymous">
+            <img id="default-top" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-top.jpg?v=1618503409685" crossorigin="anonymous">
+            <img id="default-bottom" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-bottom.jpg?v=1618503405022" crossorigin="anonymous">
         </a-assets>
         
         <a-entity id="cubemap-container">
@@ -217,6 +235,31 @@
         // 更新進度條
         function updateProgressBar(percentage) {
             document.getElementById('progress-bar').style.width = percentage + '%';
+        }
+        
+        // 使用默認全景立方體
+        function useDefaultTextures() {
+            log('使用默認全景貼圖');
+            
+            const faces = [
+                { box: 'box-front', texture: 'default-front' },
+                { box: 'box-back', texture: 'default-back' },
+                { box: 'box-right', texture: 'default-right' },
+                { box: 'box-left', texture: 'default-left' },
+                { box: 'box-top', texture: 'default-top' },
+                { box: 'box-bottom', texture: 'default-bottom' }
+            ];
+            
+            faces.forEach(face => {
+                const box = document.getElementById(face.box);
+                if (box) {
+                    box.setAttribute('material', 'src', `#${face.texture}`);
+                    log(`已設置默認貼圖: ${face.box} -> ${face.texture}`);
+                }
+            });
+            
+            // 關閉加載界面
+            document.getElementById('loader').style.display = 'none';
         }
         
         // 檢查立方體面是否載入成功
@@ -303,30 +346,88 @@
         
         // 預加載資源
         function setupAssetLoading() {
-            const assets = document.querySelectorAll('a-assets img');
+            const assets = document.querySelectorAll('a-assets img[id^="img-"]');
+            
+            // 檢查文件是否存在
+            function checkImageExists(url, callback) {
+                const img = new Image();
+                img.onload = function() { callback(true); };
+                img.onerror = function() { callback(false); };
+                img.src = url;
+            }
+            
+            // 先檢查所有圖像是否存在
+            let pendingChecks = assets.length;
+            let hasErrors = false;
+            
+            log(`開始檢查 ${assets.length} 個圖像資源`);
+            
+            if (assets.length === 0) {
+                log('錯誤: 沒有找到圖像資源標籤');
+                document.getElementById('loader-text').innerHTML = '加載失敗: 未找到圖像資源，請檢查文件路徑';
+                return;
+            }
             
             assets.forEach(asset => {
-                // 如果已經加載完成
-                if (asset.complete) {
-                    assetLoaded();
-                } else {
-                    // 監聽加載事件
-                    asset.addEventListener('load', assetLoaded);
-                    // 監聽錯誤事件
-                    asset.addEventListener('error', (e) => {
-                        log(`錯誤: 無法加載資源 ${asset.src}`);
-                        assetLoaded();
-                    });
-                }
+                // 獲取圖像URL
+                const imgUrl = asset.getAttribute('src');
+                log(`檢查圖像: ${imgUrl}`);
+                
+                checkImageExists(imgUrl, function(exists) {
+                    pendingChecks--;
+                    
+                    if (!exists) {
+                        log(`錯誤: 圖像不存在 ${imgUrl}`);
+                        hasErrors = true;
+                        
+                        // 將缺失圖像標記為紅色
+                        const elementId = asset.id.replace('img-', 'box-');
+                        const boxElement = document.getElementById(elementId);
+                        if (boxElement) {
+                            boxElement.setAttribute('material', 'color', '#ff0000');
+                        }
+                    } else {
+                        log(`圖像存在: ${imgUrl}`);
+                    }
+                    
+                    // 所有檢查完成後
+                    if (pendingChecks === 0) {
+                        if (hasErrors) {
+                            log('某些圖像文件不存在，使用備用處理方案');
+                            document.getElementById('loader-text').innerHTML = '警告: 某些全景圖像未找到，顯示可能不完整<br>請點擊「使用默認全景」按鈕';
+                        } else {
+                            log('所有圖像文件均存在，繼續加載');
+                            continueLoading();
+                        }
+                    }
+                });
             });
             
-            // 設置超時，如果10秒後仍未加載完成，則強制繼續
+            // 如果文件存在檢查通過，繼續正常加載
+            function continueLoading() {
+                assets.forEach(asset => {
+                    // 如果已經加載完成
+                    if (asset.complete) {
+                        assetLoaded();
+                    } else {
+                        // 監聽加載事件
+                        asset.addEventListener('load', assetLoaded);
+                        // 監聽錯誤事件
+                        asset.addEventListener('error', (e) => {
+                            log(`錯誤: 無法加載資源 ${asset.src}`);
+                            assetLoaded();
+                        });
+                    }
+                });
+            }
+            
+            // 無論如何，確保15秒後關閉加載界面
             setTimeout(() => {
-                if (assetsLoaded < totalAssetsToLoad) {
-                    log(`警告: 10秒後仍有${totalAssetsToLoad - assetsLoaded}個資源未加載完成，強制繼續`);
-                    document.getElementById('loader').style.display = 'none';
+                if (document.getElementById('loader').style.display !== 'none') {
+                    log('強制關閉加載界面 (15秒超時)');
+                    document.getElementById('loader-text').innerHTML = '加載超時！請點擊使用默認全景';
                 }
-            }, 10000);
+            }, 15000);
         }
         
         // 單個資源加載完成
@@ -382,6 +483,11 @@
             // 設置按鈕事件
             document.getElementById('debug-btn').addEventListener('click', showDebugInfo);
             document.getElementById('vr-btn').addEventListener('click', enterVRMode);
+            document.getElementById('use-default-btn').addEventListener('click', useDefaultTextures);
+            document.getElementById('close-loader-btn').addEventListener('click', function() {
+                log('用戶強制關閉加載界面');
+                document.getElementById('loader').style.display = 'none';
+            });
             
             // 設置畫質選擇器
             document.getElementById('quality-select').addEventListener('change', (e) => {
