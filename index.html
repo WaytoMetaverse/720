@@ -350,6 +350,60 @@
             margin-bottom: 0.5rem;
             color: #34495e;
         }
+        
+        /* VR模式設置面板 */
+        .vr-settings {
+            position: fixed;
+            top: 5rem;
+            right: 1rem;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 1rem;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 50;
+            max-width: 300px;
+            display: none;
+        }
+        
+        .vr-settings h4 {
+            margin-bottom: 0.8rem;
+            color: #2c3e50;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.5rem;
+        }
+        
+        .setting-group {
+            margin-bottom: 0.8rem;
+        }
+        
+        .setting-group label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        
+        .setting-group input[type="range"] {
+            width: 100%;
+        }
+        
+        .setting-group input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+        
+        .setting-value {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            display: inline-block;
+            min-width: 30px;
+            text-align: right;
+        }
+        
+        .setting-action {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -360,6 +414,7 @@
                 <button class="btn" id="map-btn">連接圖</button>
                 <button class="btn" id="fullscreen-btn">全螢幕</button>
                 <button class="btn vr-btn" id="vr-btn">VR模式</button>
+                <button class="btn" id="vr-settings-btn">VR設置</button>
                 <button class="btn" id="edit-btn">編輯模式</button>
                 <button class="btn" id="exit-edit-btn" style="display: none;">退出編輯</button>
                 <button class="btn" id="help-btn">幫助</button>
@@ -449,19 +504,55 @@
             <p id="nav-helper-text"></p>
         </div>
         
+        <!-- VR設置面板 -->
+        <div class="vr-settings" id="vr-settings-panel">
+            <h4>VR顯示設置</h4>
+            <div class="setting-group">
+                <label for="sky-radius">環景半徑 <span class="setting-value" id="radius-value">100</span></label>
+                <input type="range" id="sky-radius" min="10" max="200" value="100">
+            </div>
+            <div class="setting-group">
+                <label for="sky-segments">環景細節 <span class="setting-value" id="segments-value">128</span></label>
+                <input type="range" id="sky-segments" min="32" max="256" step="32" value="128">
+            </div>
+            <div class="setting-group">
+                <label for="camera-fov">視野角度 <span class="setting-value" id="fov-value">75</span></label>
+                <input type="range" id="camera-fov" min="50" max="100" value="75">
+            </div>
+            <div class="setting-group">
+                <label for="renderer-quality">
+                    <input type="checkbox" id="anti-alias" checked> 抗鋸齒
+                </label>
+            </div>
+            <div class="setting-group">
+                <label for="renderer-quality">
+                    <input type="checkbox" id="high-quality" checked> 高品質渲染
+                </label>
+            </div>
+            <div class="setting-action">
+                <button class="btn" id="reset-vr-settings">重置</button>
+                <button class="btn" id="apply-vr-settings">應用</button>
+                <button class="btn" id="close-vr-settings">關閉</button>
+            </div>
+        </div>
+        
         <div class="loader" id="loader"></div>
     </div>
     
     <!-- A-Frame 場景 -->
-    <a-scene cursor="rayOrigin: mouse" raycaster="objects: .hotspot, a-sky" vr-mode-ui="enabled: false">
+    <a-scene cursor="rayOrigin: mouse" 
+             raycaster="objects: .hotspot, a-sky" 
+             vr-mode-ui="enabled: false"
+             renderer="antialias: true; physicallyCorrectLights: true;"
+             loading-screen="dotsColor: #3498db; backgroundColor: #f5f5f5">
         <a-assets id="assets">
             <img id="panorama" crossorigin="anonymous">
         </a-assets>
-        <a-sky id="sky" src="#panorama" rotation="0 0 0"></a-sky>
+        <a-sky id="sky" src="#panorama" rotation="0 0 0" radius="100" segments-width="128" segments-height="128"></a-sky>
         <!-- 熱點容器 -->
         <a-entity id="hotspots-container"></a-entity>
         <!-- 相機及游標 -->
-        <a-camera id="camera" look-controls position="0 1.6 0">
+        <a-camera id="camera" look-controls="reverseMouseDrag: false; touchEnabled: true;" position="0 1.6 0" fov="75" near="0.1" far="10000">
             <a-cursor raycaster="objects: .hotspot" color="#FFFFFF"></a-cursor>
         </a-camera>
         <!-- VR控制器 -->
@@ -519,6 +610,15 @@
         // 熱點信息存儲
         const hotspotInfo = {};
         
+        // VR設置
+        const vrSettings = {
+            skyRadius: 100,
+            skySegments: 128,
+            cameraFov: 75,
+            antiAlias: true,
+            highQuality: true
+        };
+        
         // 推薦熱點配置
         const recommendedHotspots = {
             living: [
@@ -557,10 +657,78 @@
         let tempHotspotEntity = null;
         let currentHotspotData = null;
         let selectedHotspotId = null;
+        let isInVRMode = false;
         
         // 獲取房間顯示名稱
         function getRoomDisplayName(roomId) {
             return rooms[roomId] ? rooms[roomId].displayName : roomId;
+        }
+        
+        // 優化VR顯示
+        function optimizeForVR() {
+            // 應用VR設置
+            document.getElementById('sky').setAttribute('radius', vrSettings.skyRadius);
+            document.getElementById('sky').setAttribute('segments-width', vrSettings.skySegments);
+            document.getElementById('sky').setAttribute('segments-height', vrSettings.skySegments);
+            
+            // 調整相機
+            document.querySelector('a-camera').setAttribute('fov', vrSettings.cameraFov);
+            document.querySelector('a-camera').setAttribute('near', '0.01');
+            
+            // 設置渲染器
+            const rendererSettings = {
+                antialias: vrSettings.antiAlias,
+                precision: vrSettings.highQuality ? 'high' : 'medium',
+                physicallyCorrectLights: vrSettings.highQuality
+            };
+            
+            document.querySelector('a-scene').setAttribute('renderer', rendererSettings);
+            
+            // 更新UI
+            document.getElementById('radius-value').textContent = vrSettings.skyRadius;
+            document.getElementById('segments-value').textContent = vrSettings.skySegments;
+            document.getElementById('fov-value').textContent = vrSettings.cameraFov;
+            document.getElementById('anti-alias').checked = vrSettings.antiAlias;
+            document.getElementById('high-quality').checked = vrSettings.highQuality;
+            
+            // 更新滑桿
+            document.getElementById('sky-radius').value = vrSettings.skyRadius;
+            document.getElementById('sky-segments').value = vrSettings.skySegments;
+            document.getElementById('camera-fov').value = vrSettings.cameraFov;
+            
+            console.log('VR顯示優化設置已套用');
+        }
+        
+        // 重置為標準設置
+        function resetToStandardSettings() {
+            vrSettings.skyRadius = 10;
+            vrSettings.skySegments = 64;
+            vrSettings.cameraFov = 80;
+            vrSettings.antiAlias = true;
+            vrSettings.highQuality = false;
+            
+            // 應用標準設置
+            document.getElementById('sky').setAttribute('radius', vrSettings.skyRadius);
+            document.getElementById('sky').setAttribute('segments-width', vrSettings.skySegments);
+            document.getElementById('sky').setAttribute('segments-height', vrSettings.skySegments);
+            document.querySelector('a-camera').setAttribute('fov', vrSettings.cameraFov);
+            
+            console.log('已恢復標準顯示設置');
+        }
+        
+        // 應用當前VR設置
+        function applyVRSettings() {
+            vrSettings.skyRadius = parseInt(document.getElementById('sky-radius').value);
+            vrSettings.skySegments = parseInt(document.getElementById('sky-segments').value);
+            vrSettings.cameraFov = parseInt(document.getElementById('camera-fov').value);
+            vrSettings.antiAlias = document.getElementById('anti-alias').checked;
+            vrSettings.highQuality = document.getElementById('high-quality').checked;
+            
+            // 應用設置
+            optimizeForVR();
+            
+            // 通知使用者
+            alert('VR顯示設置已套用');
         }
         
         // 加載場景
@@ -587,6 +755,11 @@
             panoramaAsset.onload = function() {
                 const sky = document.getElementById('sky');
                 sky.setAttribute('src', '#panorama');
+                
+                // 如果在VR模式中，確保用VR優化設置
+                if (isInVRMode) {
+                    optimizeForVR();
+                }
                 
                 // 隱藏加載圖標
                 document.getElementById('loader').style.display = 'none';
@@ -658,7 +831,7 @@
         // 創建熱點實體
         function createHotspotEntity(hotspot) {
             // 將球面座標轉換為3D坐標
-            const radius = 10;
+            const radius = isInVRMode ? vrSettings.skyRadius : 10;
             const phi = THREE.MathUtils.degToRad(90 - hotspot.pitch); // 垂直角度
             const theta = THREE.MathUtils.degToRad(hotspot.yaw); // 水平角度
             
@@ -676,27 +849,42 @@
             // 根據熱點類型設置顏色
             const color = hotspot.type === 'info' ? '#3498db' : '#e74c3c';
             
-            // 創建環形熱點
-            hotspotEntity.setAttribute('geometry', 'primitive: ring; radiusInner: 0.2; radiusOuter: 0.3');
-            hotspotEntity.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9; side: double`);
-            
-            // 添加內部填充
-            const innerCircle = document.createElement('a-entity');
-            innerCircle.setAttribute('geometry', 'primitive: circle; radius: 0.18');
-            innerCircle.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.5; side: double`);
-            innerCircle.setAttribute('position', '0 0 -0.01');
-            hotspotEntity.appendChild(innerCircle);
-            
-            // 添加動畫效果
-            hotspotEntity.setAttribute('animation__scale', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
-            hotspotEntity.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true');
+            // 在VR模式下使用更簡單的熱點設計
+            if (isInVRMode) {
+                // VR模式簡化熱點
+                hotspotEntity.setAttribute('geometry', 'primitive: sphere; radius: 0.3');
+                hotspotEntity.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.8`);
+                
+                // 簡單動畫
+                hotspotEntity.setAttribute('animation__pulse', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
+            } else {
+                // 標準模式：創建環形熱點
+                hotspotEntity.setAttribute('geometry', 'primitive: ring; radiusInner: 0.2; radiusOuter: 0.3');
+                hotspotEntity.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9; side: double`);
+                
+                // 添加內部填充
+                const innerCircle = document.createElement('a-entity');
+                innerCircle.setAttribute('geometry', 'primitive: circle; radius: 0.18');
+                innerCircle.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.5; side: double`);
+                innerCircle.setAttribute('position', '0 0 -0.01');
+                hotspotEntity.appendChild(innerCircle);
+                
+                // 添加動畫效果
+                hotspotEntity.setAttribute('animation__scale', 'property: scale; to: 1.2 1.2 1.2; dir: alternate; dur: 1000; loop: true');
+                hotspotEntity.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; dur: 15000; easing: linear; loop: true');
+            }
             
             // 添加文字標籤
             const textEntity = document.createElement('a-entity');
-            textEntity.setAttribute('text', `value: ${hotspot.text}; align: center; width: 5; color: white; side: double`);
+            textEntity.setAttribute('text', `value: ${hotspot.text}; align: center; width: ${isInVRMode ? 3 : 5}; color: white; side: double`);
             textEntity.setAttribute('position', '0 0.5 0');
-            textEntity.setAttribute('geometry', 'primitive: plane; width: auto; height: auto');
-            textEntity.setAttribute('material', 'color: #333; opacity: 0.7');
+            
+            // VR模式下簡化文字背景
+            if (!isInVRMode) {
+                textEntity.setAttribute('geometry', 'primitive: plane; width: auto; height: auto');
+                textEntity.setAttribute('material', 'color: #333; opacity: 0.7');
+            }
+            
             textEntity.setAttribute('look-at', '[camera]');
             hotspotEntity.appendChild(textEntity);
             
@@ -1318,7 +1506,8 @@
                 <h3>VR模式</h3>
                 <p>- 點擊「VR模式」按鈕進入VR體驗</p>
                 <p>- 在VR模式中使用控制器指向熱點並點擊進行互動</p>
-                <p>- 也可以在手機上使用簡易VR模式，配合Google Cardboard等設備</p>
+                <p>- 您可以通過「VR設置」調整視角、顯示品質等參數以解決變形問題</p>
+                <p>- 如果觀看時有明顯變形，嘗試將環景半徑設置更大</p>
                 
                 <h3>編輯模式（需要密碼）</h3>
                 <p>- 在編輯模式下可以添加、刪除熱點</p>
@@ -1329,6 +1518,11 @@
                 <h3>連接圖</h3>
                 <p>- 點擊「連接圖」按鈕可以查看所有房間之間的連接關係</p>
                 <p>- 使用連接圖確保導覽路徑完整，沒有死胡同</p>
+                
+                <h3>VR顯示優化提示</h3>
+                <p>- 如果VR模式下畫面有變形，可嘗試增加環景半徑(100-150)</p>
+                <p>- 如果轉頭時畫面不夠平滑，可嘗試降低環景細節</p>
+                <p>- 如果感覺視角不對，可嘗試調整FOV視野角度</p>
             `;
             
             // 在模態對話框中顯示
@@ -1373,7 +1567,39 @@
             document.getElementById('fullscreen-btn').addEventListener('click', enterFullscreen);
             
             // VR按鈕事件
-            document.getElementById('vr-btn').addEventListener('click', enterVRMode);
+            document.getElementById('vr-btn').addEventListener('click', function() {
+                // 優化VR設置
+                optimizeForVR();
+                // 進入VR模式
+                enterVRMode();
+            });
+            
+            // VR設置按鈕事件
+            document.getElementById('vr-settings-btn').addEventListener('click', function() {
+                document.getElementById('vr-settings-panel').style.display = 'block';
+            });
+            
+            // 關閉VR設置面板
+            document.getElementById('close-vr-settings').addEventListener('click', function() {
+                document.getElementById('vr-settings-panel').style.display = 'none';
+            });
+            
+            // 應用VR設置
+            document.getElementById('apply-vr-settings').addEventListener('click', applyVRSettings);
+            
+            // 重置VR設置
+            document.getElementById('reset-vr-settings').addEventListener('click', function() {
+                document.getElementById('sky-radius').value = 100;
+                document.getElementById('sky-segments').value = 128;
+                document.getElementById('camera-fov').value = 75;
+                document.getElementById('anti-alias').checked = true;
+                document.getElementById('high-quality').checked = true;
+                
+                // 更新顯示值
+                document.getElementById('radius-value').textContent = 100;
+                document.getElementById('segments-value').textContent = 128;
+                document.getElementById('fov-value').textContent = 75;
+            });
             
             // 連接圖按鈕事件
             document.getElementById('map-btn').addEventListener('click', showConnectionMap);
@@ -1469,6 +1695,52 @@
             
             // 刪除熱點按鈕事件
             document.getElementById('delete-hotspot-btn').addEventListener('click', deleteSelectedHotspot);
+            
+            // VR設置滑桿實時更新顯示值
+            document.getElementById('sky-radius').addEventListener('input', function() {
+                document.getElementById('radius-value').textContent = this.value;
+            });
+            
+            document.getElementById('sky-segments').addEventListener('input', function() {
+                document.getElementById('segments-value').textContent = this.value;
+            });
+            
+            document.getElementById('camera-fov').addEventListener('input', function() {
+                document.getElementById('fov-value').textContent = this.value;
+            });
+            
+            // 監聽VR模式變化
+            document.querySelector('a-scene').addEventListener('enter-vr', function() {
+                console.log('已進入VR模式');
+                isInVRMode = true;
+                
+                // 應用VR優化設置
+                optimizeForVR();
+                
+                // 更新熱點與場景
+                updateHotspots();
+                
+                // 隱藏UI面板
+                document.querySelector('header').style.display = 'none';
+                document.querySelector('.property-info').style.display = 'none';
+                document.querySelector('.room-selector').style.display = 'none';
+            });
+            
+            document.querySelector('a-scene').addEventListener('exit-vr', function() {
+                console.log('已退出VR模式');
+                isInVRMode = false;
+                
+                // 恢復標準設置
+                resetToStandardSettings();
+                
+                // 更新熱點
+                updateHotspots();
+                
+                // 顯示UI面板
+                document.querySelector('header').style.display = 'flex';
+                document.querySelector('.property-info').style.display = 'block';
+                document.querySelector('.room-selector').style.display = 'flex';
+            });
             
             // 添加全局鍵盤快捷鍵
             document.addEventListener('keydown', function(event) {
