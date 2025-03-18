@@ -139,12 +139,12 @@
         <!-- 預加載資源 -->
         <a-assets>
             <!-- 外部資源 -->
-            <img id="img-front" src="front.jpg" crossorigin="anonymous">
-            <img id="img-back" src="back.jpg" crossorigin="anonymous">
-            <img id="img-right" src="right.jpg" crossorigin="anonymous">
-            <img id="img-left" src="left.jpg" crossorigin="anonymous">
-            <img id="img-top" src="top.jpg" crossorigin="anonymous">
-            <img id="img-bottom" src="down.jpg" crossorigin="anonymous">
+            <img id="img-front" src="cubemap/living/front.jpg" crossorigin="anonymous">
+            <img id="img-back" src="cubemap/living/back.jpg" crossorigin="anonymous">
+            <img id="img-right" src="cubemap/living/right.jpg" crossorigin="anonymous">
+            <img id="img-left" src="cubemap/living/left.jpg" crossorigin="anonymous">
+            <img id="img-top" src="cubemap/living/top.jpg" crossorigin="anonymous">
+            <img id="img-down" src="cubemap/living/down.jpg" crossorigin="anonymous">
             
             <!-- 默認資源（一定能夠加載的CDN資源） -->
             <img id="default-front" src="https://cdn.glitch.global/605e2a51-d45f-4d87-a285-9410ad350515/dist-front.jpg?v=1618503405959" crossorigin="anonymous">
@@ -196,7 +196,7 @@
                    position="0 -250 0" 
                    width="500" height="500" depth="0.1" 
                    rotation="-90 0 0" 
-                   material="shader: flat; side: back; src: #img-bottom; transparent: true; alphaTest: 0.5"></a-box>
+                   material="shader: flat; side: back; src: #img-down; transparent: true; alphaTest: 0.5"></a-box>
         </a-entity>
         
         <a-entity id="camera-rig" position="0 1.6 0">
@@ -272,7 +272,7 @@
                 { id: 'box-right', src: '#img-right' },
                 { id: 'box-left', src: '#img-left' },
                 { id: 'box-top', src: '#img-top' },
-                { id: 'box-bottom', src: '#img-bottom' }
+                { id: 'box-bottom', src: '#img-down' }
             ];
             
             faces.forEach(face => {
@@ -371,7 +371,7 @@
             assets.forEach(asset => {
                 // 獲取圖像URL
                 const imgUrl = asset.getAttribute('src');
-                log(`檢查圖像: ${imgUrl}`);
+                log(`檢查圖像資源: ${imgUrl}`);
                 
                 checkImageExists(imgUrl, function(exists) {
                     pendingChecks--;
