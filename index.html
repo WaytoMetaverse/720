@@ -1,18 +1,903 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-    <meta charset="utf-8">
-    <title>簡易立方體全景</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高品質立方體全景體驗</title>
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        /* 控制面板 */
+        .control-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            font-size: 15px;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+            transform: scale(1.05);
+        }
+        
+        .btn-red {
+            background: #e74c3c;
+        }
+        
+        .btn-red:hover {
+            background: #c0392b;
+        }
+        
+        /* 載入指示器 */
+        .loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 2000;
+            color: white;
+        }
+        
+        .loader-spinner {
+            border: 6px solid rgba(255, 255, 255, 0.2);
+            border-top: 6px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1.5s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loader-text {
+            margin-top: 25px;
+            font-size: 20px;
+            max-width: 80%;
+            text-align: center;
+            line-height: 1.5;
+        }
+        
+        /* 品質選擇器 */
+        .quality-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+        
+        .quality-selector select {
+            margin-left: 10px;
+            padding: 6px;
+            border-radius: 4px;
+            border: none;
+            background: #f1f1f1;
+        }
+        
+        .scene-selector {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+        
+        .scene-selector select {
+            margin-left: 10px;
+            padding: 6px;
+            border-radius: 4px;
+            border: none;
+            background: #f1f1f1;
+        }
+        
+        /* 性能監視器 */
+        .performance-monitor {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 900;
+        }
+        
+        /* 信息提示 */
+        .info-tooltip {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(52, 152, 219, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-    <a-scene>
-        <a-box position="0 0 0" width="1000" height="1000" depth="1000" scale="-1 1 1" color="#FFFFFF">
-            <a-sky color="#ECECEC"></a-sky>
-            <a-entity position="0 1.6 0">
-                <a-camera></a-camera>
-            </a-entity>
-        </a-box>
+    <!-- 載入指示器 -->
+    <div class="loader" id="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text" id="loader-text">正在載入高品質立方體全景...</div>
+    </div>
+    
+    <!-- 控制面板 -->
+    <div class="control-panel">
+        <button class="btn" id="screenshot-btn">截圖</button>
+        <button class="btn" id="reset-view-btn">重置視角</button>
+        <button class="btn btn-red" id="vr-btn">進入VR模式</button>
+    </div>
+    
+    <!-- 品質選擇器 -->
+    <div class="quality-selector">
+        畫質設定：
+        <select id="quality-select">
+            <option value="ultra">超高</option>
+            <option value="high" selected>高</option>
+            <option value="medium">中</option>
+            <option value="low">低</option>
+        </select>
+    </div>
+    
+    <!-- 場景選擇器 -->
+    <div class="scene-selector">
+        場景：
+        <select id="scene-select">
+            <option value="living">客廳</option>
+            <option value="bedroom">臥室</option>
+            <option value="kitchen">廚房</option>
+            <option value="bathroom">浴室</option>
+            <option value="outdoor">戶外</option>
+        </select>
+    </div>
+    
+    <!-- 性能監視器 -->
+    <div class="performance-monitor" id="performance-monitor">FPS: --</div>
+    
+    <!-- 信息提示 -->
+    <div class="info-tooltip" id="info-tooltip">已截圖</div>
+    
+    <!-- A-Frame 場景 -->
+    <a-scene 
+        loading-screen="enabled: false" 
+        vr-mode-ui="enabled: false"
+        renderer="antialias: true; physicallyCorrectLights: true; colorManagement: true; precision: high; sortObjects: true; highRefreshRate: true;">
+        
+        <!-- 資源預加載 -->
+        <a-assets timeout="10000">
+            <!-- 客廳場景資源 - 更新路徑並添加錯誤處理 -->
+            <img id="living-px" src="cubemap/living/front.jpg" crossorigin="anonymous" onerror="handleImageError(this)">
+            <img id="living-nx" src="cubemap/living/back.jpg" crossorigin="anonymous" onerror="handleImageError(this)">
+            <img id="living-py" src="cubemap/living/top.jpg" crossorigin="anonymous" onerror="handleImageError(this)">
+            <img id="living-ny" src="cubemap/living/down.jpg" crossorigin="anonymous" onerror="handleImageError(this)">
+            <img id="living-pz" src="cubemap/living/right.jpg" crossorigin="anonymous" onerror="handleImageError(this)">
+            <img id="living-nz" src="cubemap/living/left.jpg" crossorigin="anonymous" onerror="handleImageError(this)">
+            
+            <!-- 備用嘗試其他幾種路徑格式 -->
+            <img id="living-px2" src="front.jpg" crossorigin="anonymous" style="display:none">
+            <img id="living-nx2" src="back.jpg" crossorigin="anonymous" style="display:none">
+            <img id="living-py2" src="top.jpg" crossorigin="anonymous" style="display:none">
+            <img id="living-ny2" src="down.jpg" crossorigin="anonymous" style="display:none">
+            <img id="living-pz2" src="right.jpg" crossorigin="anonymous" style="display:none">
+            <img id="living-nz2" src="left.jpg" crossorigin="anonymous" style="display:none">
+            
+            <!-- 提供360度備用全景，替代立方體貼圖 -->
+            <img id="backup-pano" src="https://images.pexels.com/photos/1732414/pexels-photo-1732414.jpeg?auto=compress&cs=tinysrgb&w=1400" crossorigin="anonymous">
+        </a-assets>
+        
+        <!-- 立方體天空盒 -->
+        <a-entity id="sky-box">
+            <!-- 初始為空，將由JavaScript動態添加立方體面 -->
+        </a-entity>
+        
+        <!-- 相機控制 -->
+        <a-entity id="camera-rig" position="0 1.6 0">
+            <a-camera 
+                id="main-camera" 
+                look-controls="reverseMouseDrag: false; touchEnabled: true; magicWindowTrackingEnabled: true" 
+                wasd-controls="enabled: true; acceleration: 120" 
+                position="0 0 0" 
+                fov="80" 
+                near="0.01" 
+                far="10000">
+                <a-entity 
+                    cursor="fuse: false" 
+                    position="0 0 -1" 
+                    geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.02" 
+                    material="color: white; shader: flat" 
+                    raycaster="objects: .clickable">
+                </a-entity>
+            </a-camera>
+        </a-entity>
     </a-scene>
+    
+    <script>
+        // 全域變數
+        let currentScene = 'living'; // 預設場景
+        let qualityLevel = 'high'; // 預設畫質
+        let isVRMode = false; // VR模式狀態
+        let fpsValues = []; // 用於計算平均FPS
+        let cubeMapEntities = []; // 儲存立方體貼圖實體引用
+        let imageLoadErrors = 0; // 圖片加載錯誤計數
+        let currentPathIndex = 0; // 當前嘗試的路徑索引
+        
+        // 定義可能的圖片路徑格式
+        const possiblePaths = [
+            // 標準路徑
+            {
+                prefix: "cubemap/living/",
+                suffix: ".jpg",
+                names: ["front", "back", "top", "down", "right", "left"]
+            },
+            // 直接在根目錄
+            {
+                prefix: "",
+                suffix: ".jpg",
+                names: ["front", "back", "top", "down", "right", "left"]
+            },
+            // 使用大寫文件名
+            {
+                prefix: "cubemap/living/",
+                suffix: ".jpg",
+                names: ["Front", "Back", "Top", "Down", "Right", "Left"]
+            },
+            // 不同目錄結構
+            {
+                prefix: "living/",
+                suffix: ".jpg",
+                names: ["front", "back", "top", "down", "right", "left"]
+            },
+            // 使用數字命名
+            {
+                prefix: "cubemap/living/",
+                suffix: ".jpg",
+                names: ["1", "2", "3", "4", "5", "6"]
+            },
+            // 使用不同的擴展名
+            {
+                prefix: "cubemap/living/",
+                suffix: ".jpeg",
+                names: ["front", "back", "top", "down", "right", "left"]
+            },
+            // 使用PNG擴展名 (放在最後)
+            {
+                prefix: "cubemap/living/",
+                suffix: ".png",
+                names: ["front", "back", "top", "down", "right", "left"]
+            }
+        ];
+        
+        // 初始化函數
+        function init() {
+            console.log("初始化應用程序...");
+            
+            // 綁定事件處理
+            document.getElementById('screenshot-btn').addEventListener('click', takeScreenshot);
+            document.getElementById('reset-view-btn').addEventListener('click', resetCameraView);
+            document.getElementById('vr-btn').addEventListener('click', toggleVRMode);
+            document.getElementById('quality-select').addEventListener('change', handleQualityChange);
+            document.getElementById('scene-select').addEventListener('change', handleSceneChange);
+            
+            // 初始化場景
+            const scene = document.querySelector('a-scene');
+            scene.addEventListener('loaded', onSceneLoaded);
+            
+            // 初始化性能監視器
+            initPerformanceMonitor();
+            
+            // 防止移動設備上的觸控延遲
+            document.addEventListener('touchstart', function() {}, { passive: true });
+        }
+        
+        // 場景加載完成處理
+        function onSceneLoaded() {
+            console.log("A-Frame 場景已載入");
+            
+            // 檢查圖片是否都可用
+            checkImagesAvailability();
+            
+            // 載入第一個場景
+            loadCubeMapScene(currentScene);
+            
+            // 設置初始畫質
+            applyQualitySettings(qualityLevel);
+            
+            // 關閉載入指示器
+            hideLoader();
+        }
+        
+        // 檢查所有圖片是否可用
+        function checkImagesAvailability() {
+            const imagesToCheck = [
+                'living-px', 'living-nx', 'living-py', 
+                'living-ny', 'living-pz', 'living-nz'
+            ];
+            
+            let missedImages = [];
+            
+            imagesToCheck.forEach(imgId => {
+                const img = document.getElementById(imgId);
+                if (!img || !img.complete || img.naturalHeight === 0) {
+                    missedImages.push(imgId);
+                }
+            });
+            
+            if (missedImages.length > 0) {
+                console.warn("以下圖片無法加載:", missedImages);
+                showFilePathGuide();
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // 加載立方體貼圖場景
+        function loadCubeMapScene(sceneName) {
+            console.log(`載入場景: ${sceneName}`);
+            showLoader(`正在載入場景: ${getSceneDisplayName(sceneName)}`);
+            
+            // 如果有超過3個圖片加載錯誤，使用備用全景
+            if (imageLoadErrors >= 3) {
+                showBackupPanorama();
+                return;
+            }
+            
+            // 清除現有立方體面
+            clearCubeMapEntities();
+            
+            // 場景容器
+            const skyBox = document.getElementById('sky-box');
+            
+            // 立方體尺寸
+            const size = 5000;
+            
+            // 創建6個立方體面
+            const faces = [
+                // 前面 (positive-x)
+                { id: `${sceneName}-face-px`, position: `${size/2} 0 0`, rotation: "0 90 0", src: `#${sceneName}-px` },
+                // 後面 (negative-x)
+                { id: `${sceneName}-face-nx`, position: `${-size/2} 0 0`, rotation: "0 -90 0", src: `#${sceneName}-nx` },
+                // 上面 (positive-y)
+                { id: `${sceneName}-face-py`, position: `0 ${size/2} 0`, rotation: "90 0 0", src: `#${sceneName}-py` },
+                // 下面 (negative-y)
+                { id: `${sceneName}-face-ny`, position: `0 ${-size/2} 0`, rotation: "-90 0 0", src: `#${sceneName}-ny` },
+                // 右面 (positive-z)
+                { id: `${sceneName}-face-pz`, position: `0 0 ${size/2}`, rotation: "0 0 0", src: `#${sceneName}-pz` },
+                // 左面 (negative-z)
+                { id: `${sceneName}-face-nz`, position: `0 0 ${-size/2}`, rotation: "0 180 0", src: `#${sceneName}-nz` }
+            ];
+            
+            // 創建每個面
+            faces.forEach(face => {
+                // 檢查資源是否存在
+                const imgElement = document.querySelector(face.src);
+                if (!imgElement) {
+                    console.warn(`找不到資源: ${face.src}`);
+                    return;
+                }
+                
+                // 創建平面實體
+                const entity = document.createElement('a-entity');
+                entity.setAttribute('id', face.id);
+                entity.setAttribute('geometry', {
+                    primitive: 'plane',
+                    width: size,
+                    height: size
+                });
+                entity.setAttribute('material', {
+                    shader: 'flat',
+                    side: 'back',
+                    src: face.src,
+                    transparent: true,
+                    npot: true
+                });
+                entity.setAttribute('position', face.position);
+                entity.setAttribute('rotation', face.rotation);
+                
+                // 添加到場景
+                skyBox.appendChild(entity);
+                
+                // 儲存引用
+                cubeMapEntities.push(entity);
+            });
+            
+            // 更新當前場景
+            currentScene = sceneName;
+            
+            // 3秒後關閉載入指示器
+            setTimeout(hideLoader, 3000);
+        }
+        
+        // 清除現有立方體面
+        function clearCubeMapEntities() {
+            cubeMapEntities.forEach(entity => {
+                if (entity.parentNode) {
+                    entity.parentNode.removeChild(entity);
+                }
+            });
+            cubeMapEntities = [];
+        }
+        
+        // 應用畫質設置
+        function applyQualitySettings(level) {
+            console.log(`應用畫質設置: ${level}`);
+            
+            const renderer = document.querySelector('a-scene').renderer;
+            if (!renderer) {
+                console.warn('渲染器尚未初始化');
+                return;
+            }
+            
+            // 獲取相機
+            const camera = document.getElementById('main-camera');
+            
+            // 基於畫質設置參數
+            switch(level) {
+                case 'ultra':
+                    renderer.setPixelRatio(window.devicePixelRatio || 2);
+                    camera.setAttribute('fov', '75');
+                    // 設置高品質渲染
+                    renderer.shadowMap.enabled = true;
+                    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                    renderer.gammaOutput = true;
+                    renderer.gammaFactor = 2.2;
+                    renderer.toneMappingExposure = 1.0;
+                    break;
+                
+                case 'high':
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5) || 1.5);
+                    camera.setAttribute('fov', '80');
+                    renderer.shadowMap.enabled = true;
+                    renderer.gammaOutput = true;
+                    break;
+                
+                case 'medium':
+                    renderer.setPixelRatio(1.0);
+                    camera.setAttribute('fov', '85');
+                    renderer.shadowMap.enabled = false;
+                    break;
+                
+                case 'low':
+                    renderer.setPixelRatio(0.75);
+                    camera.setAttribute('fov', '90');
+                    renderer.shadowMap.enabled = false;
+                    // 降低紋理品質
+                    renderer.setDrawingBufferSize(
+                        window.innerWidth * 0.75,
+                        window.innerHeight * 0.75,
+                        renderer.getPixelRatio()
+                    );
+                    break;
+            }
+            
+            // 更新畫質等級
+            qualityLevel = level;
+            
+            // 更新下拉選單的選擇
+            document.getElementById('quality-select').value = level;
+            
+            // 顯示提示
+            showTooltip(`畫質已設為: ${getQualityDisplayName(level)}`);
+        }
+        
+        // 畫質變更處理
+        function handleQualityChange(e) {
+            const newQuality = e.target.value;
+            applyQualitySettings(newQuality);
+        }
+        
+        // 場景變更處理
+        function handleSceneChange(e) {
+            const newScene = e.target.value;
+            loadCubeMapScene(newScene);
+        }
+        
+        // 截圖功能
+        function takeScreenshot() {
+            const scene = document.querySelector('a-scene');
+            const dataURL = scene.components.screenshot.getCanvas('perspective').toDataURL('image/png');
+            
+            // 創建下載連結
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = `vr-panorama-${currentScene}-${new Date().toISOString().slice(0,10)}.png`;
+            link.click();
+            
+            // 顯示提示
+            showTooltip('已截圖並下載');
+        }
+        
+        // 重置相機視角
+        function resetCameraView() {
+            const cameraRig = document.getElementById('camera-rig');
+            const camera = document.getElementById('main-camera');
+            
+            // 重置位置和旋轉
+            camera.setAttribute('rotation', '0 0 0');
+            
+            // 顯示提示
+            showTooltip('視角已重置');
+        }
+        
+        // 切換VR模式
+        function toggleVRMode() {
+            const scene = document.querySelector('a-scene');
+            
+            if (!isVRMode) {
+                scene.enterVR();
+                isVRMode = true;
+            } else {
+                scene.exitVR();
+                isVRMode = false;
+            }
+        }
+        
+        // 初始化性能監視器
+        function initPerformanceMonitor() {
+            let lastTime = performance.now();
+            let frames = 0;
+            
+            function updateFPS() {
+                const now = performance.now();
+                frames++;
+                
+                if (now >= lastTime + 1000) {
+                    const fps = Math.round((frames * 1000) / (now - lastTime));
+                    document.getElementById('performance-monitor').textContent = `FPS: ${fps}`;
+                    
+                    // 保存FPS值用於計算平均值
+                    fpsValues.push(fps);
+                    if (fpsValues.length > 10) fpsValues.shift();
+                    
+                    // 如果FPS過低，自動降低畫質
+                    const avgFps = fpsValues.reduce((sum, val) => sum + val, 0) / fpsValues.length;
+                    if (avgFps < 30 && qualityLevel !== 'low') {
+                        const currentIndex = ['ultra', 'high', 'medium', 'low'].indexOf(qualityLevel);
+                        if (currentIndex < 3) {
+                            const newQuality = ['ultra', 'high', 'medium', 'low'][currentIndex + 1];
+                            console.log(`FPS過低 (${avgFps})，自動降低畫質至: ${newQuality}`);
+                            applyQualitySettings(newQuality);
+                            showTooltip(`偵測到效能不足，已自動降低畫質`);
+                        }
+                    }
+                    
+                    frames = 0;
+                    lastTime = now;
+                }
+                
+                requestAnimationFrame(updateFPS);
+            }
+            
+            requestAnimationFrame(updateFPS);
+        }
+        
+        // 顯示載入指示器
+        function showLoader(message) {
+            const loader = document.getElementById('loader');
+            const loaderText = document.getElementById('loader-text');
+            
+            if (message) {
+                loaderText.textContent = message;
+            }
+            
+            loader.style.display = 'flex';
+        }
+        
+        // 隱藏載入指示器
+        function hideLoader() {
+            document.getElementById('loader').style.display = 'none';
+        }
+        
+        // 顯示提示訊息
+        function showTooltip(message, duration = 2000) {
+            const tooltip = document.getElementById('info-tooltip');
+            tooltip.textContent = message;
+            tooltip.style.opacity = 1;
+            
+            setTimeout(() => {
+                tooltip.style.opacity = 0;
+            }, duration);
+        }
+        
+        // 獲取場景顯示名稱
+        function getSceneDisplayName(sceneName) {
+            const sceneNames = {
+                'living': '客廳',
+                'bedroom': '臥室',
+                'kitchen': '廚房',
+                'bathroom': '浴室',
+                'outdoor': '戶外'
+            };
+            
+            return sceneNames[sceneName] || sceneName;
+        }
+        
+        // 獲取畫質顯示名稱
+        function getQualityDisplayName(quality) {
+            const qualityNames = {
+                'ultra': '超高',
+                'high': '高',
+                'medium': '中',
+                'low': '低'
+            };
+            
+            return qualityNames[quality] || quality;
+        }
+        
+        // 處理圖片加載錯誤
+        function handleImageError(img) {
+            console.error(`圖片加載失敗: ${img.src}`);
+            imageLoadErrors++;
+            
+            // 提取圖片ID和路徑信息用於調試
+            const imgId = img.id;
+            const imgPath = img.src.split('/').slice(-3).join('/');
+            
+            // 設置為紅色佔位圖，便於識別問題
+            img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' fill='%23ff0000'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='20' fill='white' text-anchor='middle' dominant-baseline='middle'%3E圖片缺失%3C/text%3E%3C/svg%3E";
+            
+            // 如果單個路徑格式的全部圖片加載失敗，嘗試下一個路徑格式
+            if (imageLoadErrors >= 6 && currentPathIndex < possiblePaths.length - 1) {
+                currentPathIndex++;
+                imageLoadErrors = 0; // 重置錯誤計數
+                tryNextPathFormat();
+                return;
+            }
+            
+            // 如果所有路徑格式都嘗試過，切換到備用全景
+            if (imageLoadErrors >= 3 && currentPathIndex >= possiblePaths.length - 1) {
+                showBackupPanorama();
+                showTooltip("檢測到多個圖像缺失，已切換至備用全景模式", 5000);
+            }
+        }
+        
+        // 嘗試下一個路徑格式
+        function tryNextPathFormat() {
+            const pathConfig = possiblePaths[currentPathIndex];
+            console.log(`嘗試路徑格式 ${currentPathIndex + 1}/${possiblePaths.length}:`, pathConfig);
+            
+            showTooltip(`嘗試加載圖片路徑: ${pathConfig.prefix}${pathConfig.names[0]}${pathConfig.suffix}`, 2000);
+            
+            // 更新圖片源
+            const imgIds = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
+            
+            for (let i = 0; i < 6; i++) {
+                const imgElement = document.getElementById(`living-${imgIds[i]}`);
+                if (imgElement) {
+                    const newSrc = pathConfig.prefix + pathConfig.names[i] + pathConfig.suffix;
+                    console.log(`更新圖片 ${imgIds[i]} 路徑: ${newSrc}`);
+                    imgElement.src = newSrc;
+                }
+            }
+            
+            // 更新路徑提示信息
+            updatePathGuideInfo();
+            
+            // 3秒後檢查圖片是否加載成功
+            setTimeout(checkCurrentPathSuccess, 3000);
+        }
+        
+        // 檢查當前路徑格式是否成功
+        function checkCurrentPathSuccess() {
+            imageLoadErrors = 0; // 重置錯誤計數
+            const imgIds = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
+            let failedImages = 0;
+            
+            for (let i = 0; i < 6; i++) {
+                const imgElement = document.getElementById(`living-${imgIds[i]}`);
+                if (imgElement && (!imgElement.complete || imgElement.naturalHeight === 0)) {
+                    failedImages++;
+                }
+            }
+            
+            if (failedImages === 0) {
+                console.log("當前路徑格式加載成功!");
+                showTooltip("圖片加載成功!", 2000);
+                loadCubeMapScene(currentScene); // 重新加載場景
+                hideLoader();
+            } else if (currentPathIndex < possiblePaths.length - 1) {
+                console.log(`當前路徑格式失敗 (${failedImages}/6 圖片無法加載)，嘗試下一個...`);
+                currentPathIndex++;
+                tryNextPathFormat();
+            } else {
+                console.log("所有路徑格式均失敗，切換到備用全景");
+                showBackupPanorama();
+            }
+        }
+        
+        // 更新路徑提示信息
+        function updatePathGuideInfo() {
+            const pathConfig = possiblePaths[currentPathIndex];
+            const examplePath = pathConfig.prefix + pathConfig.names[0] + pathConfig.suffix;
+            
+            const pathInfo = document.getElementById('path-attempt-info');
+            if (pathInfo) {
+                pathInfo.innerHTML = `
+                    <div style="background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <p>正在嘗試路徑格式 ${currentPathIndex + 1}/${possiblePaths.length}: ${examplePath}</p>
+                        <p>如果您確定圖片位置，請確保六張圖片都存在且命名正確</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 手動嘗試下一個路徑格式
+        function tryNextPath() {
+            if (currentPathIndex < possiblePaths.length - 1) {
+                currentPathIndex++;
+                tryNextPathFormat();
+            } else {
+                currentPathIndex = 0; // 循環回第一個路徑
+                tryNextPathFormat();
+            }
+        }
+        
+        // 顯示備用全景圖
+        function showBackupPanorama() {
+            console.log("切換至備用全景模式");
+            
+            // 清除現有立方體面
+            clearCubeMapEntities();
+            
+            // 創建備用全景天空球
+            const skyEntity = document.createElement('a-sky');
+            skyEntity.setAttribute('src', '#backup-pano');
+            skyEntity.setAttribute('rotation', '0 -90 0');
+            
+            // 添加到場景
+            document.querySelector('a-scene').appendChild(skyEntity);
+            
+            // 隱藏載入提示
+            hideLoader();
+            
+            // 顯示提示信息
+            showTooltip("已切換到備用全景模式 - 請檢查您的圖片文件", 5000);
+        }
+        
+        // 顯示文件路徑指南
+        function showFilePathGuide() {
+            const message = `
+            <div style="text-align:left; max-width:600px; margin:0 auto;">
+                <h3 style="margin-bottom:10px;">檢測到圖片路徑問題</h3>
+                <p>請確認您的圖片文件位置符合以下結構:</p>
+                <pre style="background:#222; padding:15px; border-radius:5px; margin-top:5px;">
+(您的工作目錄)
+├── index.html
+└── cubemap/
+    └── living/
+        ├── front.jpg
+        ├── back.jpg
+        ├── right.jpg
+        ├── left.jpg
+        ├── top.jpg
+        └── down.jpg</pre>
+                <p style="margin-top:15px;">您也可以點擊'檢查文件路徑'按鈕在控制台查看詳細信息</p>
+                <div id="path-attempt-info"></div>
+            </div>`;
+            
+            const loader = document.getElementById('loader');
+            const loaderText = document.getElementById('loader-text');
+            
+            loaderText.innerHTML = message;
+            loader.style.display = 'flex';
+            
+            // 創建路徑嘗試信息容器
+            if (!document.getElementById('path-attempt-info')) {
+                const pathInfoContainer = document.createElement('div');
+                pathInfoContainer.id = 'path-attempt-info';
+                loaderText.appendChild(pathInfoContainer);
+            }
+            
+            // 更新當前嘗試的路徑信息
+            updatePathGuideInfo();
+            
+            // 添加一個檢查文件路徑的按鈕
+            const checkBtn = document.createElement('button');
+            checkBtn.textContent = '檢查文件路徑';
+            checkBtn.className = 'btn';
+            checkBtn.style.marginTop = '15px';
+            checkBtn.onclick = function() {
+                console.log('期望的圖片文件路徑:');
+                for (let i = 0; i < possiblePaths.length; i++) {
+                    const path = possiblePaths[i];
+                    console.log(`路徑格式 ${i+1}:`, path);
+                    for (let j = 0; j < 6; j++) {
+                        const fullPath = path.prefix + path.names[j] + path.suffix;
+                        console.log(`- ${["前方", "後方", "上方", "下方", "右方", "左方"][j]}: ${fullPath}`);
+                    }
+                }
+                alert('請按F12打開開發人員工具查看控制台輸出');
+            };
+            
+            // 添加一個嘗試下一個路徑格式的按鈕
+            const nextPathBtn = document.createElement('button');
+            nextPathBtn.textContent = '嘗試下一個路徑格式';
+            nextPathBtn.className = 'btn';
+            nextPathBtn.style.marginTop = '15px';
+            nextPathBtn.style.marginLeft = '10px';
+            nextPathBtn.onclick = tryNextPath;
+            
+            // 添加一個繼續使用備用圖片的按鈕
+            const continueBtn = document.createElement('button');
+            continueBtn.textContent = '使用備用全景';
+            continueBtn.className = 'btn';
+            continueBtn.style.marginTop = '15px';
+            continueBtn.style.marginLeft = '10px';
+            continueBtn.onclick = function() {
+                showBackupPanorama();
+            };
+            
+            // 添加按鈕到載入界面
+            if (!document.getElementById('check-path-btn')) {
+                loaderText.insertAdjacentElement('afterend', checkBtn);
+                checkBtn.insertAdjacentElement('afterend', nextPathBtn);
+                nextPathBtn.insertAdjacentElement('afterend', continueBtn);
+                checkBtn.id = 'check-path-btn';
+                nextPathBtn.id = 'next-path-btn';
+                continueBtn.id = 'continue-btn';
+            }
+        }
+        
+        // 初始化時嘗試第一個路徑格式
+        window.addEventListener('load', function() {
+            console.log("初始嘗試路徑格式:", possiblePaths[0]);
+            currentPathIndex = 0;
+            imageLoadErrors = 0;
+            tryNextPathFormat();
+        });
+        
+        // 頁面載入完成時初始化應用程序
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>
