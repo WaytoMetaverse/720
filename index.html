@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>直接路徑立方體全景</title>
+    <title>高品質立方體全景體驗</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
     <style>
         body {
@@ -19,109 +19,179 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: rgba(255, 255, 255, 0.8);
+            background-color: rgba(0, 0, 0, 0.9);
             z-index: 1001;
             flex-direction: column;
+            color: white;
+        }
+        .loader-spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #fff;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         .loader-text {
             margin-top: 20px;
             font-family: Arial, sans-serif;
-            color: #333;
+            color: #fff;
             max-width: 80%;
             text-align: center;
+        }
+        .loader-progress {
+            width: 300px;
+            height: 10px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        .loader-progress-bar {
+            height: 100%;
+            background-color: #3498db;
+            width: 0%;
+            transition: width 0.3s;
         }
         .controls {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 10px;
-            border-radius: 5px;
+            border-radius: 10px;
             z-index: 100;
             display: flex;
-            gap: 10px;
+            gap: 15px;
+            backdrop-filter: blur(5px);
         }
         .btn {
             background-color: #3498db;
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 10px 20px;
             border-radius: 5px;
             cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
         }
         .btn:hover {
             background-color: #2980b9;
+            transform: scale(1.05);
         }
         .vr-btn {
             background-color: #e74c3c;
+        }
+        .quality-selector {
+            display: flex;
+            align-items: center;
+            color: white;
+            margin-right: 10px;
+        }
+        .quality-selector select {
+            margin-left: 5px;
+            padding: 5px;
+            border-radius: 5px;
         }
     </style>
 </head>
 <body>
     <div class="loader" id="loader">
         <div class="loader-spinner"></div>
-        <div class="loader-text" id="loader-text">載入中...</div>
+        <div class="loader-text" id="loader-text">加載全景圖像中...</div>
+        <div class="loader-progress">
+            <div class="loader-progress-bar" id="progress-bar"></div>
+        </div>
     </div>
     
     <div class="controls">
-        <button class="btn" id="debug-btn">顯示調試信息</button>
+        <div class="quality-selector">
+            畫質:
+            <select id="quality-select">
+                <option value="high">高</option>
+                <option value="medium" selected>中</option>
+                <option value="low">低</option>
+            </select>
+        </div>
+        <button class="btn" id="debug-btn">調試信息</button>
         <button class="btn vr-btn" id="vr-btn">VR模式</button>
     </div>
     
-    <!-- 直接使用硬編碼的A-Frame場景 -->
-    <a-scene loading-screen="enabled: false" vr-mode-ui="enabled: false" renderer="antialias: true;">
-        <!-- 我們不使用a-assets進行預加載，直接設置材質 -->
+    <!-- A-Frame場景 -->
+    <a-scene loading-screen="enabled: false" 
+             vr-mode-ui="enabled: false" 
+             renderer="antialias: true; physicallyCorrectLights: true; colorManagement: true; highRefreshRate: true;">
+        
+        <!-- 預加載資源 -->
+        <a-assets>
+            <img id="img-front" src="front.jpg" crossorigin="anonymous">
+            <img id="img-back" src="back.jpg" crossorigin="anonymous">
+            <img id="img-right" src="right.jpg" crossorigin="anonymous">
+            <img id="img-left" src="left.jpg" crossorigin="anonymous">
+            <img id="img-top" src="top.jpg" crossorigin="anonymous">
+            <img id="img-bottom" src="down.jpg" crossorigin="anonymous">
+        </a-assets>
+        
         <a-entity id="cubemap-container">
             <!-- 正面 front.jpg -->
             <a-box id="box-front" 
                    position="0 0 250" 
                    width="500" height="500" depth="0.1" 
                    rotation="0 0 0" 
-                   material="shader: flat; side: back; src: front.jpg"></a-box>
+                   material="shader: flat; side: back; src: #img-front; transparent: true; alphaTest: 0.5"></a-box>
             
             <!-- 背面 back.jpg -->
             <a-box id="box-back" 
                    position="0 0 -250" 
                    width="500" height="500" depth="0.1" 
                    rotation="0 180 0" 
-                   material="shader: flat; side: back; src: back.jpg"></a-box>
+                   material="shader: flat; side: back; src: #img-back; transparent: true; alphaTest: 0.5"></a-box>
             
             <!-- 右面 right.jpg -->
             <a-box id="box-right" 
                    position="250 0 0" 
                    width="500" height="500" depth="0.1" 
                    rotation="0 -90 0" 
-                   material="shader: flat; side: back; src: right.jpg"></a-box>
+                   material="shader: flat; side: back; src: #img-right; transparent: true; alphaTest: 0.5"></a-box>
             
             <!-- 左面 left.jpg -->
             <a-box id="box-left" 
                    position="-250 0 0" 
                    width="500" height="500" depth="0.1" 
                    rotation="0 90 0" 
-                   material="shader: flat; side: back; src: left.jpg"></a-box>
+                   material="shader: flat; side: back; src: #img-left; transparent: true; alphaTest: 0.5"></a-box>
             
             <!-- 上面 top.jpg -->
             <a-box id="box-top" 
                    position="0 250 0" 
                    width="500" height="500" depth="0.1" 
                    rotation="90 0 0" 
-                   material="shader: flat; side: back; src: top.jpg"></a-box>
+                   material="shader: flat; side: back; src: #img-top; transparent: true; alphaTest: 0.5"></a-box>
             
             <!-- 下面 down.jpg -->
             <a-box id="box-bottom" 
                    position="0 -250 0" 
                    width="500" height="500" depth="0.1" 
                    rotation="-90 0 0" 
-                   material="shader: flat; side: back; src: down.jpg"></a-box>
+                   material="shader: flat; side: back; src: #img-bottom; transparent: true; alphaTest: 0.5"></a-box>
         </a-entity>
         
-        <a-camera look-controls="reverseMouseDrag: false" position="0 1.6 0" fov="85"></a-camera>
+        <a-entity id="camera-rig" position="0 1.6 0">
+            <a-camera id="main-camera" look-controls="reverseMouseDrag: false" wasd-controls="enabled: true; acceleration: 100" 
+                      position="0 0 0" fov="85" near="0.1" far="10000"></a-camera>
+        </a-entity>
     </a-scene>
     
     <script>
         // 調試信息記錄
         const debugLog = [];
+        let totalAssetsToLoad = 6; // 六個立方體面的圖像
+        let assetsLoaded = 0;
         
         // 記錄調試信息
         function log(message) {
@@ -136,6 +206,7 @@
             const loaderText = document.getElementById('loader-text');
             loaderText.innerHTML = debugLog.join('<br>');
             document.getElementById('loader').style.display = 'flex';
+            document.getElementById('progress-bar').style.display = 'none';
             
             // 10秒後自動隱藏
             setTimeout(() => {
@@ -143,17 +214,22 @@
             }, 10000);
         }
         
+        // 更新進度條
+        function updateProgressBar(percentage) {
+            document.getElementById('progress-bar').style.width = percentage + '%';
+        }
+        
         // 檢查立方體面是否載入成功
         function checkCubemapFaces() {
             log('檢查立方體面是否載入成功');
             
             const faces = [
-                { id: 'box-front', src: 'front.jpg' },
-                { id: 'box-back', src: 'back.jpg' },
-                { id: 'box-right', src: 'right.jpg' },
-                { id: 'box-left', src: 'left.jpg' },
-                { id: 'box-top', src: 'top.jpg' },
-                { id: 'box-bottom', src: 'down.jpg' }
+                { id: 'box-front', src: '#img-front' },
+                { id: 'box-back', src: '#img-back' },
+                { id: 'box-right', src: '#img-right' },
+                { id: 'box-left', src: '#img-left' },
+                { id: 'box-top', src: '#img-top' },
+                { id: 'box-bottom', src: '#img-bottom' }
             ];
             
             faces.forEach(face => {
@@ -194,6 +270,111 @@
             }
         }
         
+        // 設置畫質
+        function setQuality(level) {
+            log(`設置畫質: ${level}`);
+            const renderer = document.querySelector('a-scene').renderer;
+            const container = document.getElementById('cubemap-container');
+            
+            switch(level) {
+                case 'high':
+                    // 高畫質設置
+                    renderer.setPixelRatio(window.devicePixelRatio);
+                    container.setAttribute('scale', '1 1 1');
+                    document.getElementById('main-camera').setAttribute('fov', '85');
+                    log('已設置高畫質模式');
+                    break;
+                case 'medium':
+                    // 中等畫質設置
+                    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+                    container.setAttribute('scale', '1 1 1');
+                    document.getElementById('main-camera').setAttribute('fov', '85');
+                    log('已設置中等畫質模式');
+                    break;
+                case 'low':
+                    // 低畫質設置
+                    renderer.setPixelRatio(1.0);
+                    container.setAttribute('scale', '0.9 0.9 0.9');
+                    document.getElementById('main-camera').setAttribute('fov', '80');
+                    log('已設置低畫質模式');
+                    break;
+            }
+        }
+        
+        // 預加載資源
+        function setupAssetLoading() {
+            const assets = document.querySelectorAll('a-assets img');
+            
+            assets.forEach(asset => {
+                // 如果已經加載完成
+                if (asset.complete) {
+                    assetLoaded();
+                } else {
+                    // 監聽加載事件
+                    asset.addEventListener('load', assetLoaded);
+                    // 監聽錯誤事件
+                    asset.addEventListener('error', (e) => {
+                        log(`錯誤: 無法加載資源 ${asset.src}`);
+                        assetLoaded();
+                    });
+                }
+            });
+            
+            // 設置超時，如果10秒後仍未加載完成，則強制繼續
+            setTimeout(() => {
+                if (assetsLoaded < totalAssetsToLoad) {
+                    log(`警告: 10秒後仍有${totalAssetsToLoad - assetsLoaded}個資源未加載完成，強制繼續`);
+                    document.getElementById('loader').style.display = 'none';
+                }
+            }, 10000);
+        }
+        
+        // 單個資源加載完成
+        function assetLoaded() {
+            assetsLoaded++;
+            const percentage = Math.round((assetsLoaded / totalAssetsToLoad) * 100);
+            updateProgressBar(percentage);
+            log(`資源加載進度: ${percentage}%`);
+            
+            if (assetsLoaded >= totalAssetsToLoad) {
+                log('所有資源加載完成');
+                setTimeout(() => {
+                    document.getElementById('loader').style.display = 'none';
+                }, 500);
+            }
+        }
+        
+        // 初始化性能監視器
+        function initPerformanceMonitor() {
+            let lastTime = performance.now();
+            let frames = 0;
+            
+            function checkPerformance() {
+                frames++;
+                const now = performance.now();
+                
+                // 每秒更新一次
+                if (now - lastTime >= 1000) {
+                    const fps = Math.round(frames * 1000 / (now - lastTime));
+                    log(`當前性能: ${fps} FPS`);
+                    
+                    // 如果FPS過低，自動降低畫質
+                    if (fps < 30 && document.getElementById('quality-select').value !== 'low') {
+                        log('檢測到性能不足，自動降低畫質');
+                        document.getElementById('quality-select').value = 'low';
+                        setQuality('low');
+                    }
+                    
+                    frames = 0;
+                    lastTime = now;
+                }
+                
+                requestAnimationFrame(checkPerformance);
+            }
+            
+            requestAnimationFrame(checkPerformance);
+        }
+        
         // 頁面載入完成後執行
         document.addEventListener('DOMContentLoaded', () => {
             log('頁面載入完成');
@@ -202,20 +383,32 @@
             document.getElementById('debug-btn').addEventListener('click', showDebugInfo);
             document.getElementById('vr-btn').addEventListener('click', enterVRMode);
             
+            // 設置畫質選擇器
+            document.getElementById('quality-select').addEventListener('change', (e) => {
+                setQuality(e.target.value);
+            });
+            
+            // 初始化畫質設置
+            setQuality('medium');
+            
+            // 開始加載資源
+            setupAssetLoading();
+            
             // 監聽A-Frame場景載入完成
             const scene = document.querySelector('a-scene');
             scene.addEventListener('loaded', function() {
                 log('A-Frame場景載入完成');
                 checkCubemapFaces();
+                initPerformanceMonitor();
             });
             
-            // 3秒後檢查，無論場景是否載入完成
+            // 5秒後檢查，無論場景是否載入完成
             setTimeout(() => {
                 if (!scene.hasLoaded) {
-                    log('警告: 3秒後場景仍未載入完成');
+                    log('警告: 5秒後場景仍未載入完成');
                     checkCubemapFaces();
                 }
-            }, 3000);
+            }, 5000);
         });
     </script>
 </body>
