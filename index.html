@@ -570,7 +570,7 @@
                 
                 // 獲取場景圖像作為信息圖像
                 // 由於現在使用立方體貼圖，我們可以選擇前面的圖像
-                const infoImg = `cubemap/${rooms[currentScene].folder}/front.tif`;
+                const infoImg = `cubemap/${rooms[currentScene].folder}/front.jpg`;
                 
                 // 添加到hotspotInfo
                 hotspotInfo[id] = {
@@ -1835,13 +1835,13 @@
         
         // 設置立方體貼圖
         function setCubemapFaces(folder) {
-            // 此處使用了.tif格式，如果您使用其他格式(如jpg)，請修改擴展名
-            document.getElementById('px').src = `cubemap/${folder}/right.tif`;
-            document.getElementById('nx').src = `cubemap/${folder}/left.tif`;
-            document.getElementById('py').src = `cubemap/${folder}/top.tif`;
-            document.getElementById('ny').src = `cubemap/${folder}/down.tif`;
-            document.getElementById('pz').src = `cubemap/${folder}/front.tif`;
-            document.getElementById('nz').src = `cubemap/${folder}/back.tif`;
+            // 此處使用了.jpg格式，如果您使用其他格式(如jpg)，請修改擴展名
+            document.getElementById('px').src = `cubemap/${folder}/right.jpg`;
+            document.getElementById('nx').src = `cubemap/${folder}/left.jpg`;
+            document.getElementById('py').src = `cubemap/${folder}/top.jpg`;
+            document.getElementById('ny').src = `cubemap/${folder}/down.jpg`;
+            document.getElementById('pz').src = `cubemap/${folder}/front.jpg`;
+            document.getElementById('nz').src = `cubemap/${folder}/back.jpg`;
             
             // 等待所有圖片載入後更新立方體
             const images = ['px', 'nx', 'py', 'ny', 'pz', 'nz'];
