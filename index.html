@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>簡化版立方體全景</title>
+    <title>直接路徑立方體全景</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
     <style>
         body {
@@ -27,6 +27,8 @@
             margin-top: 20px;
             font-family: Arial, sans-serif;
             color: #333;
+            max-width: 80%;
+            text-align: center;
         }
         .controls {
             position: fixed;
@@ -67,36 +69,57 @@
         <button class="btn vr-btn" id="vr-btn">VR模式</button>
     </div>
     
-    <a-scene loading-screen="enabled: false" vr-mode-ui="enabled: false">
-        <a-assets>
-            <!-- 立方體貼圖資源 - 我們使用空白src，然後在JavaScript中設置 -->
-            <img id="right" crossorigin="anonymous">
-            <img id="left" crossorigin="anonymous">
-            <img id="top" crossorigin="anonymous">
-            <img id="bottom" crossorigin="anonymous">
-            <img id="front" crossorigin="anonymous">
-            <img id="back" crossorigin="anonymous">
-        </a-assets>
-        
-        <!-- 立方體天空盒 -->
+    <!-- 直接使用硬編碼的A-Frame場景 -->
+    <a-scene loading-screen="enabled: false" vr-mode-ui="enabled: false" renderer="antialias: true;">
+        <!-- 我們不使用a-assets進行預加載，直接設置材質 -->
         <a-entity id="cubemap-container">
-            <a-box id="box-right" material="shader: flat; side: back"></a-box>
-            <a-box id="box-left" material="shader: flat; side: back"></a-box>
-            <a-box id="box-top" material="shader: flat; side: back"></a-box>
-            <a-box id="box-bottom" material="shader: flat; side: back"></a-box>
-            <a-box id="box-front" material="shader: flat; side: back"></a-box>
-            <a-box id="box-back" material="shader: flat; side: back"></a-box>
+            <!-- 正面 front.jpg -->
+            <a-box id="box-front" 
+                   position="0 0 250" 
+                   width="500" height="500" depth="0.1" 
+                   rotation="0 0 0" 
+                   material="shader: flat; side: back; src: front.jpg"></a-box>
+            
+            <!-- 背面 back.jpg -->
+            <a-box id="box-back" 
+                   position="0 0 -250" 
+                   width="500" height="500" depth="0.1" 
+                   rotation="0 180 0" 
+                   material="shader: flat; side: back; src: back.jpg"></a-box>
+            
+            <!-- 右面 right.jpg -->
+            <a-box id="box-right" 
+                   position="250 0 0" 
+                   width="500" height="500" depth="0.1" 
+                   rotation="0 -90 0" 
+                   material="shader: flat; side: back; src: right.jpg"></a-box>
+            
+            <!-- 左面 left.jpg -->
+            <a-box id="box-left" 
+                   position="-250 0 0" 
+                   width="500" height="500" depth="0.1" 
+                   rotation="0 90 0" 
+                   material="shader: flat; side: back; src: left.jpg"></a-box>
+            
+            <!-- 上面 top.jpg -->
+            <a-box id="box-top" 
+                   position="0 250 0" 
+                   width="500" height="500" depth="0.1" 
+                   rotation="90 0 0" 
+                   material="shader: flat; side: back; src: top.jpg"></a-box>
+            
+            <!-- 下面 down.jpg -->
+            <a-box id="box-bottom" 
+                   position="0 -250 0" 
+                   width="500" height="500" depth="0.1" 
+                   rotation="-90 0 0" 
+                   material="shader: flat; side: back; src: down.jpg"></a-box>
         </a-entity>
         
         <a-camera look-controls="reverseMouseDrag: false" position="0 1.6 0" fov="85"></a-camera>
     </a-scene>
     
     <script>
-        // 定義要使用的文件夾和文件格式
-        const imageFolder = 'living'; // 您的文件夾路徑，根據需要調整
-        const imageFormat = '.jpg';   // 或者 '.tif'，根據您的文件格式
-        const cubemapSize = 500;      // 立方體大小
-        
         // 調試信息記錄
         const debugLog = [];
         
@@ -114,116 +137,46 @@
             loaderText.innerHTML = debugLog.join('<br>');
             document.getElementById('loader').style.display = 'flex';
             
-            // 5秒後自動隱藏
+            // 10秒後自動隱藏
             setTimeout(() => {
                 document.getElementById('loader').style.display = 'none';
             }, 10000);
         }
         
-        // 設置立方體貼圖
-        function setupCubemap() {
-            log('開始設置立方體貼圖');
+        // 檢查立方體面是否載入成功
+        function checkCubemapFaces() {
+            log('檢查立方體面是否載入成功');
             
-            // 圖片ID和相應的文件名
-            const faceMap = {
-                'right': 'right',
-                'left': 'left',
-                'top': 'top',
-                'bottom': 'down', // 注意這裡的不同
-                'front': 'front',
-                'back': 'back'
-            };
+            const faces = [
+                { id: 'box-front', src: 'front.jpg' },
+                { id: 'box-back', src: 'back.jpg' },
+                { id: 'box-right', src: 'right.jpg' },
+                { id: 'box-left', src: 'left.jpg' },
+                { id: 'box-top', src: 'top.jpg' },
+                { id: 'box-bottom', src: 'down.jpg' }
+            ];
             
-            // 載入計數器和總數
-            let loadedCount = 0;
-            const totalImages = Object.keys(faceMap).length;
-            
-            // 更新載入進度
-            function updateProgress() {
-                const percentage = Math.floor((loadedCount / totalImages) * 100);
-                document.getElementById('loader-text').textContent = `載入中... ${percentage}%`;
-            }
-            
-            log(`將從文件夾 "${imageFolder}" 中載入 ${totalImages} 張 ${imageFormat} 格式的圖片`);
-            
-            // 為每個面設置圖片
-            for (const [elementId, fileName] of Object.entries(faceMap)) {
-                const imgElement = document.getElementById(elementId);
-                const imgSrc = `${imageFolder}/${fileName}${imageFormat}`;
-                
-                log(`嘗試載入: ${imgSrc}`);
-                imgElement.src = imgSrc;
-                
-                // 圖片載入成功
-                imgElement.onload = () => {
-                    loadedCount++;
-                    log(`成功載入: ${imgSrc} (${loadedCount}/${totalImages})`);
-                    updateProgress();
+            faces.forEach(face => {
+                const element = document.getElementById(face.id);
+                if (element) {
+                    log(`檢查面 ${face.id} (${face.src}): 元素存在`);
                     
-                    // 所有圖片載入完成後設置立方體
-                    if (loadedCount === totalImages) {
-                        log('所有圖片載入完成，設置立方體');
-                        createCubemap();
+                    // 嘗試獲取材質屬性
+                    const materialAttr = element.getAttribute('material');
+                    if (materialAttr && materialAttr.src) {
+                        log(`- 材質: ${JSON.stringify(materialAttr)}`);
+                    } else {
+                        log(`- 警告: 材質未正確設置`);
                     }
-                };
-                
-                // 圖片載入失敗
-                imgElement.onerror = () => {
-                    log(`錯誤: 無法載入 ${imgSrc}`);
-                    loadedCount++;
-                    updateProgress();
-                    
-                    // 即使出錯也繼續
-                    if (loadedCount === totalImages) {
-                        log('儘管有錯誤，所有圖片處理完成');
-                        createCubemap();
-                    }
-                };
-            }
-        }
-        
-        // 創建立方體貼圖
-        function createCubemap() {
-            log('開始創建立方體');
+                } else {
+                    log(`錯誤: 找不到元素 ${face.id}`);
+                }
+            });
             
-            try {
-                // 設置每個面的位置、旋轉和材質
-                setupFace('box-right', 'right', [cubemapSize/2, 0, 0], [0, -90, 0]);
-                setupFace('box-left', 'left', [-cubemapSize/2, 0, 0], [0, 90, 0]);
-                setupFace('box-top', 'top', [0, cubemapSize/2, 0], [90, 0, 0]);
-                setupFace('box-bottom', 'bottom', [0, -cubemapSize/2, 0], [-90, 0, 0]);
-                setupFace('box-front', 'front', [0, 0, cubemapSize/2], [0, 0, 0]);
-                setupFace('box-back', 'back', [0, 0, -cubemapSize/2], [0, 180, 0]);
-                
-                log('立方體創建完成');
-                
-                // 隱藏載入提示
-                document.getElementById('loader').style.display = 'none';
-            } catch (error) {
-                log(`創建立方體時出錯: ${error.message}`);
-                document.getElementById('loader-text').textContent = `錯誤: ${error.message}`;
-            }
-        }
-        
-        // 設置立方體的單個面
-        function setupFace(boxId, imgId, position, rotation) {
-            const boxElement = document.getElementById(boxId);
+            log('立方體面檢查完成');
             
-            // 設置圖片材質
-            boxElement.setAttribute('material', `shader: flat; side: back; src: #${imgId}`);
-            
-            // 設置位置
-            boxElement.setAttribute('position', position.join(' '));
-            
-            // 設置旋轉
-            boxElement.setAttribute('rotation', rotation.join(' '));
-            
-            // 設置大小
-            boxElement.setAttribute('width', cubemapSize);
-            boxElement.setAttribute('height', cubemapSize);
-            boxElement.setAttribute('depth', 0.1);
-            
-            log(`設置面 ${boxId} 完成`);
+            // 隱藏載入提示
+            document.getElementById('loader').style.display = 'none';
         }
         
         // 進入VR模式
@@ -249,8 +202,20 @@
             document.getElementById('debug-btn').addEventListener('click', showDebugInfo);
             document.getElementById('vr-btn').addEventListener('click', enterVRMode);
             
-            // 開始設置立方體貼圖
-            setupCubemap();
+            // 監聽A-Frame場景載入完成
+            const scene = document.querySelector('a-scene');
+            scene.addEventListener('loaded', function() {
+                log('A-Frame場景載入完成');
+                checkCubemapFaces();
+            });
+            
+            // 3秒後檢查，無論場景是否載入完成
+            setTimeout(() => {
+                if (!scene.hasLoaded) {
+                    log('警告: 3秒後場景仍未載入完成');
+                    checkCubemapFaces();
+                }
+            }, 3000);
         });
     </script>
 </body>
